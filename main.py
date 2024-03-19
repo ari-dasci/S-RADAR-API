@@ -6,4 +6,4 @@ app.include_router(utils.router)
 
 @app.get("/")
 async def root():
-    return {"message": "Hello Bigger Applications!"}
+    return {"message": "Hello Bigger Applications!!"}
