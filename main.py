@@ -10,16 +10,19 @@ app.include_router(static_data.router)
 app.include_router(time_series.router)
 
 origins = [
-    "http://localhost:4200",
+    "http://localhost:36799",
+    "*"
 ]
 
+# Add CORS middleware with allowed origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins,  # Allow frontend's domain
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allows all headers
 )
+
 
 @app.get("/")
 async def root():
