@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from routers import utils
+from routers import federated_data
 from routers import static_data
 from routers import time_series
 from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
 app.include_router(utils.router)
+app.include_router(federated_data.router)
 app.include_router(static_data.router)
 app.include_router(time_series.router)
 
