@@ -41,17 +41,30 @@ async def get_sklearn_algorithms():
     return list(sklearn_algorithms.keys())
 
 
+# Obtain the default parameters of a specific algorithm
 @router.get("/static_data/get_params/{_model}", tags=["static_data"])
 async def get_params(_model: str):
     kwargs = {"algorithm_": _model}
-    model = pyod.PyodAnomalyDetection(**kwargs)
-    return list(model.get_params())
-
-@router.get("/static_data/set_params/", tags=["static_data"])
-async def set_params(request: Request):
-    try:
-        kwargs = dict(request.query_params)  # parse ?key=value&key2=value2 into dict
+    # Check if algorithm_ is present in any category
+    if _model in pyod_algorithms:
         model = pyod.PyodAnomalyDetection(**kwargs)
+    elif _model in sklearn_algorithms:
+        model = sklearn.SkLearnAnomalyDetection(**kwargs)
+    return model.get_params()
+
+
+@router.post("/static_data/set_params", tags=["static_data"])
+async def set_params_post(request: Request):
+    try:
+        # Parse the JSON body of the request into a dictionary
+        kwargs = await request.json()
+        print(kwargs)
+
+        # Check if algorithm_ is present in any category
+        if kwargs["algorithm_"] in pyod_algorithms:
+            model = pyod.PyodAnomalyDetection(**kwargs)
+        elif kwargs["algorithm_"] in sklearn_algorithms:
+            model = sklearn.SkLearnAnomalyDetection(**kwargs)
         return model.get_params()
     except Exception as e:
         # Return the error message as JSON
