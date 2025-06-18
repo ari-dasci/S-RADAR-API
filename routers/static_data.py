@@ -1,3 +1,4 @@
+from inspect import signature
 from fastapi import APIRouter
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.encoders import jsonable_encoder
@@ -8,6 +9,7 @@ from SADL.static_data import get_categories as gc
 from SADL.static_data.algorithms import get_algorithms as ga
 from SADL.static_data.algorithms.pyod import pyod_algorithms
 from SADL.static_data.algorithms.sklearn import sklearn_algorithms
+from SADL.static_data.static_datasets_uci import datasets
 
 from SADL.static_data.algorithms import pyod
 from SADL.static_data.algorithms import sklearn
@@ -40,17 +42,19 @@ async def get_pyod_algorithms():
 async def get_sklearn_algorithms():
     return list(sklearn_algorithms.keys())
 
+@router.get("/static_data/datasets", tags=["static_data"])
+async def get_datasets():
+    return list(datasets.keys())
 
 # Obtain the default parameters of a specific algorithm
 @router.get("/static_data/get_params/{_model}", tags=["static_data"])
 async def get_params(_model: str):
     kwargs = {"algorithm_": _model}
     # Check if algorithm_ is present in any category
-    if _model in pyod_algorithms:
-        model = pyod.PyodAnomalyDetection(**kwargs)
-    elif _model in sklearn_algorithms:
-        model = sklearn.SkLearnAnomalyDetection(**kwargs)
-    return model.get_params()
+    if _model in pyod_algorithms or _model in sklearn_algorithms:
+       kwargs = obtener_parametros(_model, "pyod" if _model in pyod_algorithms else "sklearn")
+
+    return kwargs
 
 
 @router.post("/static_data/set_params", tags=["static_data"])
@@ -69,3 +73,22 @@ async def set_params_post(request: Request):
     except Exception as e:
         # Return the error message as JSON
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+def obtener_parametros(_model: str, _type: str):
+    if _type == 'pyod':
+        init_signature = signature(pyod_algorithms[_model].__init__)
+    elif _type == 'sklearn':
+        init_signature = signature(sklearn_algorithms[_model].__init__)
+    
+    # Consider the constructor parameters excluding 'self'
+    parameters = [p for p in init_signature.parameters.values()
+                  if p.name != 'self' and p.kind != p.VAR_KEYWORD]
+    kwargs = {"algorithm_": _model}
+    for p in parameters:
+        if p.default is p.empty and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
+            kwargs[p.name] = "REQUIRED"
+        else:
+            kwargs[p.name] = p.default
+    print(kwargs)
+    return kwargs
