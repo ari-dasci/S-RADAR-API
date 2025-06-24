@@ -3,6 +3,7 @@ from routers import utils
 from routers import federated_data
 from routers import static_data
 from routers import time_series
+from routers import pipelines   
 from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
 
@@ -10,6 +11,7 @@ app.include_router(utils.router)
 app.include_router(federated_data.router)
 app.include_router(static_data.router)
 app.include_router(time_series.router)
+app.include_router(pipelines.router)
 
 origins = [
     "http://localhost:36799",
