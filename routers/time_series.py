@@ -6,6 +6,7 @@ from SADL.time_series.algorithms import get_algorithms as ga
 from SADL.time_series.algorithms.tsfedl import tsfedl_algorithms
 from SADL.time_series.algorithms import tsfedl as tsfedl
 from SADL.time_series.time_series_datasets_uci import datasets
+from SADL.time_series.preprocessing.preprocessing_ts import preprocessing_ts_algorithms
 router = APIRouter()
 
 @router.get("/time_series/algorithms", tags=["time_series"])
@@ -30,6 +31,11 @@ async def get_tsfedl_algorithms():
 @router.get("/time_series/datasets", tags=["time_series"])
 async def get_datasets():
     return list(datasets.keys())
+
+
+@router.get("/time_series/preprocessing", tags=["time_series"])
+async def get_preprocessing():
+    return list(preprocessing_ts_algorithms)
 
 # Obtain the default parameters of a specific algorithm
 @router.get("/time_series/get_params/{_model}", tags=["time_series"])

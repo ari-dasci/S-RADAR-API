@@ -10,6 +10,7 @@ from SADL.static_data.algorithms import get_algorithms as ga
 from SADL.static_data.algorithms.pyod import pyod_algorithms
 from SADL.static_data.algorithms.sklearn import sklearn_algorithms
 from SADL.static_data.static_datasets_uci import datasets
+from SADL.static_data.preprocessing.preprocessing_static import preprocessing_static_algorithms
 
 from SADL.static_data.algorithms import pyod
 from SADL.static_data.algorithms import sklearn
@@ -45,6 +46,10 @@ async def get_sklearn_algorithms():
 @router.get("/static_data/datasets", tags=["static_data"])
 async def get_datasets():
     return list(datasets.keys())
+
+@router.get("/static_data/preprocessing", tags=["static_data"])
+async def get_preprocessing():
+    return list(preprocessing_static_algorithms)
 
 # Obtain the default parameters of a specific algorithm
 @router.get("/static_data/get_params/{_model}", tags=["static_data"])
@@ -92,3 +97,4 @@ def obtener_parametros(_model: str, _type: str):
             kwargs[p.name] = p.default
     print(kwargs)
     return kwargs
+
