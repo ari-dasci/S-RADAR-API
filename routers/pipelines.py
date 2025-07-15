@@ -29,6 +29,9 @@ import numpy as np
 
 router = APIRouter()
 
+def get_predecessors(node_id: str, edges: list):
+    return [edge["source"] for edge in edges if edge["target"] == node_id]
+
 @router.post("/pipelines/run_pipeline", tags=["pipelines"])
 async def run_pipeline(request: Request):
     data = await request.json()
@@ -51,7 +54,7 @@ async def run_pipeline(request: Request):
 
     # Step 2: Execute nodes in order
     context: Dict[str, Any] = {}
-
+    visualizations = {}  # Dictionary to store node_id: plotly_json
     for node_id in sorted_node_ids:
         node = nodes[node_id]
         node_category = node.get("category", "")
@@ -66,10 +69,11 @@ async def run_pipeline(request: Request):
             if(node_category == "static_data"):
                 X, y = global_load_static(params["dataset"])
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
-                context["X_train"] = X_train
-                context["y_train"] = y_train
-                context["X_test"] = X_test
-                context["y_test"] = y_test
+                #context["X_train"] = X_train
+                #context["y_train"] = y_train
+                #context["X_test"] = X_test
+                #context["y_test"] = y_test
+                context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
                 print(f"Dataset loaded: {params['dataset']}")
 
             elif(node_category == "time_series"):
@@ -77,17 +81,34 @@ async def run_pipeline(request: Request):
                 X, y = global_load_ts(params["dataset"])
                 #TODO: what to do with this data division
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
-                context["X_train"] = X_train
-                context["y_train"] = y_train
-                context["X_test"] = X_test
-                context["y_test"] = y_test
+                #context["X_train"] = X_train
+                #context["y_train"] = y_train
+                #context["X_test"] = X_test
+                #context["y_test"] = y_test
+                context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
                 print(f"Dataset loaded: {params['dataset']}")
 
         elif node_type == "Preprocessing":
             print(f"Preprocessing...{model_type}")
-            X_train = context.get("X_train")
-            X_test = context.get("X_test")
-            print(f"Current dataset: {X}")
+
+            predecessors = get_predecessors(node_id, edges)
+            if not predecessors:
+                return {"error": f"No predecessor found for visualization node {node_id}"}
+            
+            prev_node_id = predecessors[0]
+            prev_output = context.get(prev_node_id)
+
+            if prev_output is None:
+                return {"error": f"No data to visualize from previous node {prev_node_id}"}
+
+            # Infer what kind of data it is
+            if ("X_train" in prev_output):
+                X_train = prev_output["X_train"]
+            if ("X_test" in prev_output):
+                X_test = prev_output["X_test"]
+            else:
+                return {"error": f"No valid data found in previous node {prev_node_id}"}
+
             if X_train is None:
                 raise ValueError("No dataset loaded before preprocessing")
 
@@ -103,8 +124,10 @@ async def run_pipeline(request: Request):
             scaler_instance = ScalerClass()
             X_scaled = scaler_instance.fit_transform(X_train)
             X_test_scaled = scaler_instance.transform(X_test)
-            context["X_train"] = X_scaled
-            context["X_test"] = X_test_scaled
+            #context["X_train"] = X_scaled
+            #context["X_test"] = X_test_scaled
+
+            context[node_id] = {"X_scaled": X_scaled, "X_test_scaled": X_test_scaled}
             print(f"Preprocessing done: {scaler_instance}")
 
         elif node_type == "Model Setup":
@@ -156,19 +179,45 @@ async def run_pipeline(request: Request):
             pred = model.predict(X_test)
             print(f"Prediction: {pred}")
 
-        elif node_type == "Visualize":
-            np.random.seed(42)
-            data = np.random.rand(100,5)   
+        elif node_type == "Visualization":
 
+            predecessors = get_predecessors(node_id, edges)
+            if not predecessors:
+                return {"error": f"No predecessor found for visualization node {node_id}"}
 
-            vis = DataVisualization(data, plot_technique='heatmap', heatmap_color='viridis') 
+            
+            prev_node_id = predecessors[0]
+            prev_output = context.get(prev_node_id)
+
+            if prev_output is None:
+                return {"error": f"No data to visualize from previous node {prev_node_id}"}
+            print(prev_output)
+            # Infer what kind of data it is
+            if ("X_train" in prev_output):
+                data_to_plot = prev_output["X_train"]
+            elif ("X_scaled" in prev_output):
+                data_to_plot = prev_output["X_scaled"]
+            else:
+                return {"error": f"No valid data found in previous node {prev_node_id}"}
+            
+            # Create visualization
+            clean_params = {k: v for k, v in params.items() if v not in [None, "", [], "plot"]}
+            clean_params.pop("plot", None)
+            
+            # Optional: Cast known numeric parameters
+            if "n_components" in clean_params:
+                try:
+                    clean_params["n_components"] = int(clean_params["n_components"])
+                except ValueError:
+                    pass  # Keep as string if it's e.g., 'mle'
+            print(f"Creating visualization for node {node_id} with params: {clean_params}")
+            vis = DataVisualization(data_to_plot, **clean_params) 
             vis.fit()  
-            json = vis.to_json()    
-            print(f"Visualization created: {json}")   
-            #visualizer = DataVisualization(data=None, plot_technique='anomaly_labels', y_true=true[40:60], y_pred=pred[40:60])
-
-
+            json_fig = vis.to_json()    
+            visualizations[node_id] = json_fig
+            print(f"Visualization for node {node_id} created from {prev_node_id}")
+            
         else:
             return {"error": f"Unknown node type: {node_type}"}
 
-    return {"message": "Pipeline executed"}
+    return {"message": "Pipeline executed","visualizations": visualizations}
