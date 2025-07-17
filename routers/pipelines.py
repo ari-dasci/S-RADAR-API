@@ -26,6 +26,29 @@ from SADL.time_series.preprocessing.preprocessing_ts import preprocessing_ts_alg
 from SADL.visualization_module import DataVisualization
 
 import numpy as np
+import torch
+
+
+class topModuleTSFEDL(torch.nn.Module):
+    def __init__(self, in_features=103, out_features=103, npred=1):
+        super(topModuleTSFEDL, self).__init__()
+        self.npred = npred
+        self.model = torch.nn.Sequential(
+            torch.nn.Dropout(p=0.2),
+            torch.nn.Linear(in_features=in_features, out_features=50),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=50, out_features=npred*out_features)
+        )
+
+    def forward(self, x):
+        out = self.model(x)
+        if len(out.shape)>2:
+            out = out[:, -1, :]
+        if self.npred > 1:
+            # Reshape to (batch_size, npred, out_features)
+            out = out.reshape(out.shape[0], self.npred, -1)
+        return out 
+
 
 router = APIRouter()
 
@@ -146,6 +169,16 @@ async def run_pipeline(request: Request):
 
             elif(params['algorithm_'] in tsfedl_algorithms):
                 kwargs = params
+
+                #Set top_module class manually
+                in_features_ = int(kwargs["in_features_topmodule"])
+                out_features_ = int(kwargs["out_features_topmodule"])
+                kwargs["top_module"] = topModuleTSFEDL(in_features=in_features_, out_features=out_features_)
+                kwargs["in_features"] = int(kwargs["in_features_topmodule"])
+                kwargs.pop("in_features_topmodule", None)
+                kwargs.pop("out_features_topmodule", None)
+                print(f"kwargs before initialization: {kwargs}")
+
                 model = tsfedl.TsfedlAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
                 context["model"] = model
@@ -156,12 +189,9 @@ async def run_pipeline(request: Request):
                 print(f"Model initialized: {model}")
                 context["model"] = model
 
-        elif node_type == "Fit Model":
-            model = context.get("model")
-            X = context.get("X_train")
-
             model.fit(X)
             print(f"Model fitted: {model}")
+            
 
         elif node_type == "Decision Function Model":
             model = context.get("model")

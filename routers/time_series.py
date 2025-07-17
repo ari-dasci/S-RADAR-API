@@ -7,6 +7,27 @@ from SADL.time_series.algorithms.tsfedl import tsfedl_algorithms
 from SADL.time_series.algorithms import tsfedl as tsfedl
 from SADL.time_series.time_series_datasets_uci import datasets
 from SADL.time_series.preprocessing.preprocessing_ts import preprocessing_ts_algorithms
+import torch
+
+class topModuleTDFEDL(torch.nn.Module):
+    def __init__(self, in_features=103, out_features=103, npred=1):
+        super(topModuleTDFEDL, self).__init__()
+        self.npred = npred
+        self.model = torch.nn.Sequential(
+            torch.nn.Dropout(p=0.2),
+            torch.nn.Linear(in_features=in_features, out_features=50),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=50, out_features=npred*out_features)
+        )
+
+    def forward(self, x):
+        out = self.model(x)
+        if len(out.shape)>2:
+            out = out[:, -1, :]
+        if self.npred > 1:
+            # Reshape to (batch_size, npred, out_features)
+            out = out.reshape(out.shape[0], self.npred, -1)
+
 router = APIRouter()
 
 @router.get("/time_series/algorithms", tags=["time_series"])
@@ -44,6 +65,16 @@ async def get_params(_model: str):
     # Check if algorithm_ is present in any category
     if _model in tsfedl_algorithms:
         kwargs = obtener_parametros(_model, "tsfedl")
+
+        #Set or modify some specific parameters for tsfedl
+        kwargs["in_features_topmodule"] = "REQUIRED"
+        kwargs["out_features_topmodule"] = "REQUIRED"
+        if "loss" in kwargs:
+            kwargs["loss"] = "torch.nn.MSELoss()"
+        if "optimizer" in kwargs:
+            kwargs["optimizer"] = None
+        if "input_shape" in kwargs:
+            kwargs["input_shape"] = "(126,126)"
     return kwargs
 
 
@@ -53,12 +84,25 @@ async def set_params_post(request: Request):
     try:
         # Parse the JSON body of the request into a dictionary
         kwargs = await request.json()
-        print(kwargs)
+        in_features_ = int(kwargs["in_features_topmodule"])
+        out_features_ = int(kwargs["out_features_topmodule"])
+        if "in_features_topmodule" in kwargs and "out_features_topmodule" in kwargs:
+            kwargs["top_module"] = topModuleTDFEDL(in_features=in_features_, out_features=out_features_)
+        if "in_features" in kwargs:
+            kwargs["in_features"] = int(kwargs["in_features"])
+        kwargs.pop("in_features_topmodule", None)
+        kwargs.pop("out_features_topmodule", None)
+        if "loss" in kwargs:
+            kwargs["loss"] = torch.nn.MSELoss()
+        if "input_shape" in kwargs:
+            kwargs["input_shape"] = (126,126)
+            
+        print(f"kwargs before setting params: {kwargs}")
 
         # Check if algorithm_ is present in any category
         if kwargs["algorithm_"] in tsfedl_algorithms:
             model = tsfedl.TsfedlAnomalyDetection(**kwargs)
-        return model.get_params()
+        #return model.get_params()
     except Exception as e:
         # Return the error message as JSON
         raise HTTPException(status_code=400, detail=str(e))

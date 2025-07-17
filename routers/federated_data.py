@@ -63,16 +63,6 @@ def obtener_parametros(_model: str, _type: str):
             kwargs[p.name] = "REQUIRED"
         else:
             kwargs[p.name] = p.default
-    if _type == 'flexanomalies':
-        kwargs = {
-        "algorithm_": "isolationForest",
-        "contamination":0.1,
-        "label_parser": None,
-        "n_estimators": 100, 
-        "n_rounds": 10,
-        "n_clients":5,
-        }
-        model = flexanomalies.FlexAnomalyDetection(**kwargs)
-        kwargs = model.get_params()
-        print(f"obtener_parametros: {kwargs}")
+    
+    print(f"obtener_parametros: {kwargs}")
     return kwargs
