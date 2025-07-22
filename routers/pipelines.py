@@ -76,8 +76,13 @@ async def run_pipeline(request: Request):
         return {"error": f"Cycle detected in graph: {e}"}
 
     # Step 2: Execute nodes in order
+    results_dict: Dict[str, Any] = {
+        "message": "Pipeline execution finished with an unknown error",
+    } # Dictionary to store final results
     context: Dict[str, Any] = {}
     visualizations = {}  # Dictionary to store node_id: plotly_json
+    results = None  # Variable to store numerical results from the pipeline
+
     for node_id in sorted_node_ids:
         node = nodes[node_id]
         node_category = node.get("category", "")
@@ -92,22 +97,17 @@ async def run_pipeline(request: Request):
             if(node_category == "static_data"):
                 X, y = global_load_static(params["dataset"])
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
-                #context["X_train"] = X_train
-                #context["y_train"] = y_train
-                #context["X_test"] = X_test
-                #context["y_test"] = y_test
+
                 context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
                 print(f"Dataset loaded: {params['dataset']}")
 
             elif(node_category == "time_series"):
                 # Placeholder for time series dataset loading logic
                 X, y = global_load_ts(params["dataset"])
-                #TODO: what to do with this data division
+
+                #DEFAULT data division
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
-                #context["X_train"] = X_train
-                #context["y_train"] = y_train
-                #context["X_test"] = X_test
-                #context["y_test"] = y_test
+
                 context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
                 print(f"Dataset loaded: {params['dataset']}")
 
@@ -116,24 +116,26 @@ async def run_pipeline(request: Request):
 
             predecessors = get_predecessors(node_id, edges)
             if not predecessors:
-                return {"error": f"No predecessor found for visualization node {node_id}"}
+                return {"message": f" Error: (Preprocessing) No predecessor found for Preprocessing node."}
             
             prev_node_id = predecessors[0]
             prev_output = context.get(prev_node_id)
 
             if prev_output is None:
-                return {"error": f"No data to visualize from previous node {prev_node_id}"}
+                return {"message": f"Error: (Preprocessing) No data to preprocess from previous node."}
 
             # Infer what kind of data it is
             if ("X_train" in prev_output):
                 X_train = prev_output["X_train"]
             if ("X_test" in prev_output):
                 X_test = prev_output["X_test"]
-            else:
-                return {"error": f"No valid data found in previous node {prev_node_id}"}
+            if ("y_train" in prev_output):
+                y_train = prev_output["y_train"]
+            if ("y_test" in prev_output):
+                y_test = prev_output["y_test"]
 
             if X_train is None:
-                raise ValueError("No dataset loaded before preprocessing")
+                return {"message": f"Error: (Preprocessing) No dataset loaded before preprocessing."}
 
             ScalerClass = None
             if (model_type in preprocessing_static_algorithms):
@@ -142,112 +144,228 @@ async def run_pipeline(request: Request):
                 ScalerClass = preprocessing_ts_algorithms.get(model_type)
                 
             if ScalerClass is None:
-                return {"error": f"Unknown preprocessing model_type: {model_type}"}
+                return {"message": f"Error: (Preprocessing) Unknown preprocessing model_type: {model_type}"}
             
             scaler_instance = ScalerClass()
             X_scaled = scaler_instance.fit_transform(X_train)
             X_test_scaled = scaler_instance.transform(X_test)
-            #context["X_train"] = X_scaled
-            #context["X_test"] = X_test_scaled
-
-            context[node_id] = {"X_scaled": X_scaled, "X_test_scaled": X_test_scaled}
+            #y_scaled = scaler_instance.transform(y_train) 
+            #y_test_scaled = scaler_instance.transform(y_test)
+            print(X_scaled)
+            context[node_id] = {**prev_output, "X_scaled": X_scaled, "X_test_scaled": X_test_scaled}
             print(f"Preprocessing done: {scaler_instance}")
 
         elif node_type == "Model Setup":
             print(f"Setting up model: {params['algorithm_']}")
+
+            predecessors = get_predecessors(node_id, edges)
+            prev_node_id = predecessors[0]
+            prev_output = context.get(prev_node_id)
+
+            if prev_output is None:
+                return {"message": f"Error: (Model Fitting) No predecessor found for model fitting node."}
+            
+            # Infer data for training
+            if ("X_train" in prev_output):
+                X = prev_output["X_train"]
+            if ("X_test" in prev_output):
+                X = prev_output["X_test"]
+            if ("X_scaled" in prev_output):
+                X = prev_output["X_scaled"]
+                print("Tengo X_scaled")
+            if X is None:
+                return {"message": f"Error: (Model Fitting) No valid data found in previous node."}
+
             if(params['algorithm_'] in pyod_algorithms):
                 kwargs = params
                 model = pyod.PyodAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
-                context["model"] = model
 
             elif(params['algorithm_'] in sklearn_algorithms):
                 kwargs = params
                 model = sklearn.SkLearnAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
-                context["model"] = model
 
             elif(params['algorithm_'] in tsfedl_algorithms):
                 kwargs = params
 
-                #Set top_module class manually
+                #Set TSFEDL specific parameters
                 in_features_ = int(kwargs["in_features_topmodule"])
                 out_features_ = int(kwargs["out_features_topmodule"])
-                kwargs["top_module"] = topModuleTSFEDL(in_features=in_features_, out_features=out_features_)
-                kwargs["in_features"] = int(kwargs["in_features_topmodule"])
+                if "in_features_topmodule" in kwargs and "out_features_topmodule" in kwargs:
+                    kwargs["top_module"] = topModuleTSFEDL(in_features=in_features_, out_features=out_features_)
+                if "in_features" in kwargs:
+                    kwargs["in_features"] = int(kwargs["in_features"])
                 kwargs.pop("in_features_topmodule", None)
                 kwargs.pop("out_features_topmodule", None)
+                if "loss" in kwargs:
+                    kwargs["loss"] = torch.nn.MSELoss()
+                if "input_shape" in kwargs:
+                    kwargs["input_shape"] = (126,126)
+                
                 print(f"kwargs before initialization: {kwargs}")
 
                 model = tsfedl.TsfedlAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
-                context["model"] = model
 
             elif(params['algorithm_'] in flexanomalies_algorithms):
                 kwargs = params
                 model = flexanomalies.FlexAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
-                context["model"] = model
 
             model.fit(X)
+            context[node_id] = {"model": model, 
+                                 "X_train": prev_output.get("X_train", None),
+                                 "X_test": prev_output.get("X_test", None),
+                                 "X_test_scaled": prev_output.get("X_test_scaled", None),
+                                 "y_train": prev_output.get("y_train", None), 
+                                 "y_scaled": prev_output.get("y_scaled", None),
+                                 "y_test": prev_output.get("y_test", None),
+                                 "y_test_scaled": prev_output.get("y_test_scaled", None)}
+            print(context[node_id])
             print(f"Model fitted: {model}")
             
 
         elif node_type == "Decision Function Model":
-            model = context.get("model")
-            X_train = context.get("X_train")
+            predecessors = get_predecessors(node_id, edges)
+            if not predecessors:
+                return {"message": f"Error: (Decision Function) No predecessor found for Decision Function node."}
+            
+            prev_node_id = predecessors[0]
+            prev_output = context.get(prev_node_id)
+
+            model = prev_output.get("model")
+            X_train = prev_output.get("X_train")
             scores_pred = model.decision_function(X_train)* -1
             print("Scores",scores_pred)
+            # Add scores_pred to previous context, preserving other keys
+            context[node_id] = {**prev_output, "data": scores_pred}
+
+            results = scores_pred.tolist()
+            results_dict["results_dec"] = results
+            results_str = str(results)
+            results_dict["message"] = "Pipeline executed successfully! Results are: " + results_str[:100] + "...\n If you want to see the complete output, please export the results."
+            
 
         elif node_type == "Predict Model":
-            model = context.get("model")
-            X_test = context.get("X_test")
+            predecessors = get_predecessors(node_id, edges)
+            prev_node_id = predecessors[0]
+            prev_output = context.get(prev_node_id)
 
+            if prev_output is None:
+                return {"message": f"Error: (Predict) No predecessor found for predict node {node_id}"}
+            
+            # Infer data for prediction
+            if ("X_test" in prev_output and prev_output["X_test"] is not None):
+                X = prev_output["X_test"]
+            if ("X_test_scaled" in prev_output and prev_output["X_test_scaled"] is not None):
+                X = prev_output["X_test_scaled"]
+            if X is None:
+                return {"message": f"Error: (Predict) No valid data found in previous node."}
+           
+            if ("model" in prev_output and prev_output["model"] is not None):
+                model = prev_output["model"]
             if model is None:
-                raise ValueError("Model not set up before prediction")
+                return {"message": f"Error: (Predict) Model not set up before prediction."}
 
-            pred = model.predict(X_test)
-            print(f"Prediction: {pred}")
+            pred = model.predict(X)
+            # Add scores_pred to previous context, preserving other keys
+            context[node_id] = {**prev_output, "data": pred}
+
+            print(f"Prediction context : {context[node_id]}")
+            results = pred.tolist() 
+            results_dict["results_pred"] = results
+            results_str = str(results)
+            results_dict["message"] = "Pipeline executed successfully! Results are: " + results_str[:100] + "...\n If you want to see the complete output, please export the results."
 
         elif node_type == "Visualization":
 
             predecessors = get_predecessors(node_id, edges)
             if not predecessors:
-                return {"error": f"No predecessor found for visualization node {node_id}"}
-
-            
+                return {"message": f"Error: (Visualization) No predecessor found for visualization node."}            
             prev_node_id = predecessors[0]
             prev_output = context.get(prev_node_id)
 
             if prev_output is None:
-                return {"error": f"No data to visualize from previous node {prev_node_id}"}
-            print(prev_output)
-            # Infer what kind of data it is
-            if ("X_train" in prev_output):
-                data_to_plot = prev_output["X_train"]
-            elif ("X_scaled" in prev_output):
-                data_to_plot = prev_output["X_scaled"]
-            else:
-                return {"error": f"No valid data found in previous node {prev_node_id}"}
-            
-            # Create visualization
-            clean_params = {k: v for k, v in params.items() if v not in [None, "", [], "plot"]}
-            clean_params.pop("plot", None)
-            
-            # Optional: Cast known numeric parameters
-            if "n_components" in clean_params:
-                try:
-                    clean_params["n_components"] = int(clean_params["n_components"])
-                except ValueError:
-                    pass  # Keep as string if it's e.g., 'mle'
-            print(f"Creating visualization for node {node_id} with params: {clean_params}")
-            vis = DataVisualization(data_to_plot, **clean_params) 
-            vis.fit()  
-            json_fig = vis.to_json()    
-            visualizations[node_id] = json_fig
-            print(f"Visualization for node {node_id} created from {prev_node_id}")
-            
-        else:
-            return {"error": f"Unknown node type: {node_type}"}
+                return {"message": f"Error: (Visualization) No data to visualize from previous node."}
 
-    return {"message": "Pipeline executed","visualizations": visualizations}
+            # Check previous node type
+            if prev_node["op_type"] == "Load Dataset":
+                data_to_plot = prev_output["X_train"]
+
+                # Create visualization
+                clean_params = {k: v for k, v in params.items() if v not in [None, "", [], "plot"]}
+                clean_params.pop("plot", None)
+                # Optional: Cast known numeric parameters
+                if "n_components" in clean_params:
+                    try:
+                        clean_params["n_components"] = int(clean_params["n_components"])
+                    except ValueError:
+                        pass 
+
+                
+                vis = DataVisualization(data_to_plot, **clean_params) 
+                vis.fit()  
+                json_fig = vis.to_json()    
+                visualizations[node_id] = json_fig
+
+                # Store visualizations in results
+                results_dict["visualizations"] = visualizations
+
+            elif prev_node["op_type"] == "Preprocessing":
+                data_to_plot = prev_output["X_scaled"]
+
+                # Create visualization
+                clean_params = {k: v for k, v in params.items() if v not in [None, "", [], "plot"]}
+                clean_params.pop("plot", None)
+                # Optional: Cast known numeric parameters
+                if "n_components" in clean_params:
+                    try:
+                        clean_params["n_components"] = int(clean_params["n_components"])
+                    except ValueError:
+                        pass 
+
+                
+                vis = DataVisualization(data_to_plot, **clean_params) 
+                vis.fit()  
+                json_fig = vis.to_json()    
+                visualizations[node_id] = json_fig
+
+                # Store visualizations in results
+                results_dict["visualizations"] = visualizations
+
+            elif prev_node["op_type"] == "Predict Model":
+                data_to_plot = prev_output["X_test"]
+
+                true = np.array(prev_output["y_test"]).flatten()
+                pred = np.array(prev_output["data"]).astype(int)
+                clean_params = {k: v for k, v in params.items() if v not in [None, "", [], "plot"]}
+                clean_params["y_true"] = true
+                clean_params["y_pred"] = pred
+                clean_params.pop("plot", None)
+            
+                #Cast known numeric parameters
+                if "n_components" in clean_params:
+                    clean_params["n_components"] = int(clean_params["n_components"])
+                if "subset_size_percent" in clean_params:       
+                    clean_params["subset_size_percent"] = float(clean_params["subset_size_percent"])
+
+                print(f"Creating visualization for node {node_id} with params: {clean_params}")
+                vis = DataVisualization(data_to_plot, **clean_params) 
+                vis.fit()  
+                json_fig = vis.to_json()    
+                visualizations[node_id] = json_fig
+                # Store visualizations in results
+                results_dict["visualizations"] = visualizations
+                
+            else: 
+                return {"message": f"Error: (Visualization) Previous node is not a valid source for visualization."}
+            
+            results_dict["message"] = "Visualization created successfully!"
+
+        else:
+            return {"message": f"Unknown node type: {node_type}"}
+        
+        #Once node is processed, store its data for the next iteration
+        prev_node = node
+    return results_dict
