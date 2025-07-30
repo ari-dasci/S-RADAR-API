@@ -11,12 +11,14 @@ from SADL.static_data.algorithms.pyod import pyod_algorithms
 from SADL.static_data.algorithms.sklearn import sklearn_algorithms
 from SADL.time_series.algorithms.tsfedl import tsfedl_algorithms
 from SADL.federated_data.algorithms.flexanomalies import flexanomalies_algorithms
+from SADL.time_series.algorithms.transformers import transformers_algorithms
 
 #Models
 from SADL.static_data.algorithms import pyod
 from SADL.static_data.algorithms import sklearn
 from SADL.time_series.algorithms import tsfedl
 from SADL.federated_data.algorithms import flexanomalies
+from SADL.time_series.algorithms import transformers
 
 #Preprocessing
 from SADL.static_data.preprocessing.preprocessing_static import preprocessing_static_algorithms
@@ -25,8 +27,28 @@ from SADL.time_series.preprocessing.preprocessing_ts import preprocessing_ts_alg
 # Visualization
 from SADL.visualization_module import DataVisualization
 
+
+from SADL.time_series.preprocessing.preprocessing_ts import StandardScalerPreprocessing
+from SADL.time_series.time_series_utils import TimeSeriesProcessor
+
 import numpy as np
 import torch
+
+
+from torch.utils.data import Dataset
+
+class PermuteDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        x = self.X[idx].permute(1, 0)
+        y = self.y[idx]
+        return x, y
 
 
 class topModuleTSFEDL(torch.nn.Module):
@@ -95,21 +117,29 @@ async def run_pipeline(request: Request):
             print(f"Loading dataset: {params}")
 
             if(node_category == "static_data"):
-                X, y = global_load_static(params["dataset"])
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
+                data = global_load_static(params["dataset"])
 
+                if isinstance(data, tuple):
+                    if len(data) == 2:
+                        X, y = data
+                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
+                    elif len(data) == 4:
+                        X_train, X_test, y_train, y_test = data
                 context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
-                print(f"Dataset loaded: {params['dataset']}")
 
             elif(node_category == "time_series"):
                 # Placeholder for time series dataset loading logic
-                X, y = global_load_ts(params["dataset"])
+                if params["dataset"] == "ai4i_2020_predictive_maintenance_dataset": #TODO: Change for different datasets
+                    X, y = global_load_ts(params["dataset"])
+                    y = y["Machine failure"]
+                    X = X.drop('Type',axis=1)  # remove Type or apply one hot encoding
+                    
+                context[node_id] = {"X_train": X, "y_train": y}
+           
 
-                #DEFAULT data division
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
+            
+            print(f"Dataset loaded: {params['dataset']}")
 
-                context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
-                print(f"Dataset loaded: {params['dataset']}")
 
         elif node_type == "Preprocessing":
             print(f"Preprocessing...{model_type}")
@@ -149,9 +179,7 @@ async def run_pipeline(request: Request):
             scaler_instance = ScalerClass()
             X_scaled = scaler_instance.fit_transform(X_train)
             X_test_scaled = scaler_instance.transform(X_test)
-            #y_scaled = scaler_instance.transform(y_train) 
-            #y_test_scaled = scaler_instance.transform(y_test)
-            print(X_scaled)
+            
             context[node_id] = {**prev_output, "X_scaled": X_scaled, "X_test_scaled": X_test_scaled}
             print(f"Preprocessing done: {scaler_instance}")
 
@@ -162,14 +190,15 @@ async def run_pipeline(request: Request):
             prev_node_id = predecessors[0]
             prev_output = context.get(prev_node_id)
 
+            context[node_id] = {}
             if prev_output is None:
                 return {"message": f"Error: (Model Fitting) No predecessor found for model fitting node."}
             
             # Infer data for training
             if ("X_train" in prev_output):
                 X = prev_output["X_train"]
-            if ("X_test" in prev_output):
-                X = prev_output["X_test"]
+            #if ("X_test" in prev_output):
+            #    X = prev_output["X_test"]
             if ("X_scaled" in prev_output):
                 X = prev_output["X_scaled"]
                 print("Tengo X_scaled")
@@ -180,11 +209,13 @@ async def run_pipeline(request: Request):
                 kwargs = params
                 model = pyod.PyodAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
+                model.fit(X)
 
             elif(params['algorithm_'] in sklearn_algorithms):
                 kwargs = params
                 model = sklearn.SkLearnAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
+                model.fit(X)
 
             elif(params['algorithm_'] in tsfedl_algorithms):
                 kwargs = params
@@ -207,21 +238,61 @@ async def run_pipeline(request: Request):
 
                 model = tsfedl.TsfedlAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
+                model.fit(prev_output.get("train_loader", None))
 
             elif(params['algorithm_'] in flexanomalies_algorithms):
                 kwargs = params
+                print(  f"kwargs before initialization flexanomalies: {kwargs}")
+                # Set FlexAnomalies specific parameters
+                #kwargs["n_clients"] = 15
+                kwargs["n_rounds"] = 5
+
+                if "input_shape" in kwargs:
+                    kwargs["input_dim"] = X.shape[1]
+
                 model = flexanomalies.FlexAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
+                model.fit(X, prev_output.get("y_train", None))
 
-            model.fit(X)
-            context[node_id] = {"model": model, 
-                                 "X_train": prev_output.get("X_train", None),
-                                 "X_test": prev_output.get("X_test", None),
-                                 "X_test_scaled": prev_output.get("X_test_scaled", None),
-                                 "y_train": prev_output.get("y_train", None), 
-                                 "y_scaled": prev_output.get("y_scaled", None),
-                                 "y_test": prev_output.get("y_test", None),
-                                 "y_test_scaled": prev_output.get("y_test_scaled", None)}
+            elif(params['algorithm_'] in transformers_algorithms):
+                kwargs = params
+                # Set Transformers specific parameters
+                kwargs["label_parser"] = None
+                kwargs['train_epochs'] = 1
+                kwargs['batch_size']= 16
+                kwargs['lr']= 0.001
+                # Set Tranformers train loader
+                scaler = StandardScalerPreprocessing()
+                X_scaled = scaler.fit_transform(X)
+                X_train, X_test, y_train, y_test = train_test_split(X_scaled, prev_output["y_train"], test_size=0.2, random_state=42)
+
+                processor = TimeSeriesProcessor(window_size=kwargs["seq_len"], step_size=1,future_prediction=False)
+                X_train_windows, y_train_windows, X_test_windows, y_test_windows = processor.process_train_test(X_train, y_train, X_test, y_test)
+
+                model = transformers.TransformersAnomalyDetection(**kwargs)
+                model.fit(X_train_windows)
+
+                
+                context[node_id]["X_train_windows"] = X_train_windows
+                context[node_id]["X_test_windows"] = X_test_windows
+                context[node_id]["y_train_windows"] = y_train_windows
+                context[node_id]["y_test_windows"] = y_test_windows
+                context[node_id]["X_test"] = X_test
+                context[node_id]["y_test"] = y_test
+
+            
+            context[node_id]["model"] = model
+            context[node_id]["X_train"] = prev_output.get("X_train", None)
+            if context[node_id].get("X_test") is None:
+                context[node_id]["X_test"] = prev_output.get("X_test", None)
+            context[node_id]["X_test_scaled"] = prev_output.get("X_test_scaled", None)
+            context[node_id]["y_train"] = prev_output.get("y_train", None)
+            context[node_id]["y_scaled"] = prev_output.get("y_scaled", None)
+            if context[node_id].get("y_test") is None:
+                context[node_id]["y_test"] = prev_output.get("y_test", None)
+            context[node_id]["y_test_scaled"] = prev_output.get("y_test_scaled", None)
+            context[node_id]["train_loader"] = prev_output.get("train_loader", None)
+
             print(context[node_id])
             print(f"Model fitted: {model}")
             
@@ -235,7 +306,11 @@ async def run_pipeline(request: Request):
             prev_output = context.get(prev_node_id)
 
             model = prev_output.get("model")
-            X_train = prev_output.get("X_train")
+            if "X_train" in prev_output:
+                X_train = prev_output.get("X_train")
+            if "X_test_windows" in prev_output:
+                X_train = prev_output.get("X_test_windows")
+
             scores_pred = model.decision_function(X_train)* -1
             print("Scores",scores_pred)
             # Add scores_pred to previous context, preserving other keys
@@ -260,6 +335,8 @@ async def run_pipeline(request: Request):
                 X = prev_output["X_test"]
             if ("X_test_scaled" in prev_output and prev_output["X_test_scaled"] is not None):
                 X = prev_output["X_test_scaled"]
+            if ("X_test_windows" in prev_output and prev_output["X_test_windows"] is not None):
+                X = prev_output["X_test_windows"]
             if X is None:
                 return {"message": f"Error: (Predict) No valid data found in previous node."}
            
@@ -272,8 +349,8 @@ async def run_pipeline(request: Request):
             # Add scores_pred to previous context, preserving other keys
             context[node_id] = {**prev_output, "data": pred}
 
-            print(f"Prediction context : {context[node_id]}")
-            results = pred.tolist() 
+            #print(f"Prediction context : {context[node_id]}")
+            results = pred.labels_.tolist() if hasattr(pred, 'labels_') else pred.tolist()
             results_dict["results_pred"] = results
             results_str = str(results)
             results_dict["message"] = "Pipeline executed successfully! Results are: " + results_str[:100] + "...\n If you want to see the complete output, please export the results."
@@ -336,10 +413,19 @@ async def run_pipeline(request: Request):
 
             elif prev_node["op_type"] == "Predict Model":
                 data_to_plot = prev_output["X_test"]
-
-                true = np.array(prev_output["y_test"]).flatten()
-                pred = np.array(prev_output["data"]).astype(int)
                 clean_params = {k: v for k, v in params.items() if v not in [None, "", [], "plot"]}
+                if prev_output.get("y_train_windows") is not None: #Transformer values
+                    print("MME MEETOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+                    print(prev_output["X_test"])
+                    model = prev_output["model"]
+                    model.evaluate(prev_output.get("X_test_windows"),prev_output.get("y_test_windows"))
+                    pred = model.labels_preds
+                    true = np.array(prev_output.get("y_test")).ravel()
+                else:
+                    true = np.array(prev_output["y_test"]).flatten()
+                    pred = np.array(prev_output["data"]).astype(int)
+                
+                
                 clean_params["y_true"] = true
                 clean_params["y_pred"] = pred
                 clean_params.pop("plot", None)
@@ -349,7 +435,7 @@ async def run_pipeline(request: Request):
                     clean_params["n_components"] = int(clean_params["n_components"])
                 if "subset_size_percent" in clean_params:       
                     clean_params["subset_size_percent"] = float(clean_params["subset_size_percent"])
-
+                
                 print(f"Creating visualization for node {node_id} with params: {clean_params}")
                 vis = DataVisualization(data_to_plot, **clean_params) 
                 vis.fit()  

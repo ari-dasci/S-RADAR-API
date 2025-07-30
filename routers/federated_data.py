@@ -1,4 +1,6 @@
 from inspect import signature
+
+import numpy as np
 from fastapi import APIRouter, HTTPException,Request
 
 from SADL.federated_data.algorithms import get_algorithms as ga
@@ -16,6 +18,7 @@ async def get_library_algorithms(library: str):
     response = []
     if library == 'flexanomalies':
         response = await get_flexanomalies_algorithms()
+        
     return response
 
 @router.get("/federated_data/library_algorithms_flexanomalies", tags=["federated_data"])
@@ -39,6 +42,11 @@ async def set_params_post(request: Request):
         kwargs = await request.json()
         kwargs.pop("model", None)
         print(f"modificar parametros: {kwargs}")
+        if "input_dim" in kwargs:
+            default = np.random.rand(100, 1)
+            kwargs["input_dim"] = default.shape[1] # Special value for FlexAnomalies, only for pipeline to work
+            kwargs["hidden_act"]= ['relu', 'relu', 'relu']
+            kwargs["neurons"] =[16, 8, 16]
 
         # Check if algorithm_ is present in any category
         if kwargs["algorithm_"] in flexanomalies_algorithms:
@@ -57,7 +65,7 @@ def obtener_parametros(_model: str, _type: str):
     # Consider the constructor parameters excluding 'self'
     parameters = [p for p in init_signature.parameters.values()
                   if p.name != 'self' and p.kind != p.VAR_KEYWORD]
-    kwargs = {"algorithm_": _model}
+    kwargs = {"algorithm_": _model, "n_clients": "REQUIRED"}
     for p in parameters:
         if p.default is p.empty and p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD):
             kwargs[p.name] = "REQUIRED"
