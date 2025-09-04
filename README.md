@@ -26,13 +26,13 @@ The API exposes endpoints to run pipelines, manage data, and execute algorithms 
 ### Clone the API (backend) repository
 
 ```bash
-git clone https://github.com/marinahbau/S-ADL-API.git
+git clone https://github.com/ari-dasci/S-ADL-API.git
 ```
 
 ### Clone the S-ADL library
 
 ```bash
-git clone https://github.com/marinahbau/S-ADL.git
+git clone https://github.com/ari-dasci/S-ADL.git
 ```
 
 ### Install S-ADL library + API (conda environment)
@@ -43,7 +43,7 @@ conda create --prefix ./envs/sadl-env python=3.10.18
 
 conda activate ./envs/sadl-env 
 
-conda env update --prefix /mnt/homeGPU/mbautista/sadl-env --file sadl-env.yml --prune
+conda env update --prefix /path/to/env --file environment.yml --prune   # Replace /path/to/env with the location of your Conda environment.
 
 #Make sure Pytorch is installed now, if you have CUDA 11.8
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
