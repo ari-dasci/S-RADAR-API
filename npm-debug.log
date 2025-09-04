@@ -1,0 +1,228 @@
+0 info it worked if it ends with ok
+1 verbose cli [ '/mnt/homeGPU/mbautista/s-adl-soft-lib/bin/node',
+1 verbose cli   '/mnt/homeGPU/mbautista/s-adl-soft-lib/bin/npm',
+1 verbose cli   'install',
+1 verbose cli   '-D',
+1 verbose cli   '@types/drawflow' ]
+2 info using npm@3.10.10
+3 info using node@v6.13.1
+4 silly loadCurrentTree Starting
+5 silly install loadCurrentTree
+6 silly install readLocalPackageData
+7 silly fetchPackageMetaData @types/drawflow
+8 silly fetchNamedPackageData @types/drawflow
+9 silly mapToRegistry name @types/drawflow
+10 silly mapToRegistry scope (from package name) @types
+11 verbose mapToRegistry no registry URL found in name for scope @types
+12 silly mapToRegistry using default registry
+13 silly mapToRegistry registry https://registry.npmjs.org/
+14 silly mapToRegistry data Result {
+14 silly mapToRegistry   raw: '@types/drawflow',
+14 silly mapToRegistry   scope: '@types',
+14 silly mapToRegistry   escapedName: '@types%2fdrawflow',
+14 silly mapToRegistry   name: '@types/drawflow',
+14 silly mapToRegistry   rawSpec: '',
+14 silly mapToRegistry   spec: 'latest',
+14 silly mapToRegistry   type: 'tag' }
+15 silly mapToRegistry uri https://registry.npmjs.org/@types%2fdrawflow
+16 verbose request uri https://registry.npmjs.org/@types%2fdrawflow
+17 verbose request no auth needed
+18 info attempt registry request try #1 at 11:34:19 AM
+19 verbose request id 1af8a5bedb1f11d5
+20 http request GET https://registry.npmjs.org/@types%2fdrawflow
+21 http 200 https://registry.npmjs.org/@types%2fdrawflow
+22 verbose headers { date: 'Wed, 03 Apr 2024 11:34:20 GMT',
+22 verbose headers   'content-type': 'application/json',
+22 verbose headers   'transfer-encoding': 'chunked',
+22 verbose headers   connection: 'keep-alive',
+22 verbose headers   'cf-ray': '86e8bfb15b4248ab-LIS',
+22 verbose headers   'cf-cache-status': 'REVALIDATED',
+22 verbose headers   'access-control-allow-origin': '*',
+22 verbose headers   'cache-control': 'public, max-age=300',
+22 verbose headers   etag: 'W/"b4c5bc0abe6d2ff871b226d314e79cda"',
+22 verbose headers   'last-modified': 'Mon, 11 Mar 2024 08:37:46 GMT',
+22 verbose headers   vary: 'accept-encoding, accept',
+22 verbose headers   server: 'cloudflare',
+22 verbose headers   'content-encoding': 'gzip' }
+23 silly get cb [ 200,
+23 silly get   { date: 'Wed, 03 Apr 2024 11:34:20 GMT',
+23 silly get     'content-type': 'application/json',
+23 silly get     'transfer-encoding': 'chunked',
+23 silly get     connection: 'keep-alive',
+23 silly get     'cf-ray': '86e8bfb15b4248ab-LIS',
+23 silly get     'cf-cache-status': 'REVALIDATED',
+23 silly get     'access-control-allow-origin': '*',
+23 silly get     'cache-control': 'public, max-age=300',
+23 silly get     etag: 'W/"b4c5bc0abe6d2ff871b226d314e79cda"',
+23 silly get     'last-modified': 'Mon, 11 Mar 2024 08:37:46 GMT',
+23 silly get     vary: 'accept-encoding, accept',
+23 silly get     server: 'cloudflare',
+23 silly get     'content-encoding': 'gzip' } ]
+24 verbose get saving @types/drawflow to /home/mbautista/.npm/registry.npmjs.org/_40types_252fdrawflow/.cache.json
+25 verbose correctMkdir /home/mbautista/.npm correctMkdir not in flight; initializing
+26 silly install normalizeTree
+27 silly loadCurrentTree Finishing
+28 silly loadIdealTree Starting
+29 silly install loadIdealTree
+30 silly cloneCurrentTree Starting
+31 silly install cloneCurrentTreeToIdealTree
+32 silly cloneCurrentTree Finishing
+33 silly loadShrinkwrap Starting
+34 silly install loadShrinkwrap
+35 silly loadShrinkwrap Finishing
+36 silly loadAllDepsIntoIdealTree Starting
+37 silly install loadAllDepsIntoIdealTree
+38 silly resolveWithNewModule @types/drawflow@0.0.11 checking installable status
+39 silly cache add args [ '@types/drawflow', null ]
+40 verbose cache add spec @types/drawflow
+41 silly cache add parsed spec Result {
+41 silly cache add   raw: '@types/drawflow',
+41 silly cache add   scope: '@types',
+41 silly cache add   escapedName: '@types%2fdrawflow',
+41 silly cache add   name: '@types/drawflow',
+41 silly cache add   rawSpec: '',
+41 silly cache add   spec: 'latest',
+41 silly cache add   type: 'tag' }
+42 silly addNamed @types/drawflow@latest
+43 verbose addNamed "latest" is being treated as a dist-tag for @types/drawflow
+44 info addNameTag [ '@types/drawflow', 'latest' ]
+45 silly mapToRegistry name @types/drawflow
+46 silly mapToRegistry scope (from package name) @types
+47 verbose mapToRegistry no registry URL found in name for scope @types
+48 silly mapToRegistry using default registry
+49 silly mapToRegistry registry https://registry.npmjs.org/
+50 silly mapToRegistry data Result {
+50 silly mapToRegistry   raw: '@types/drawflow',
+50 silly mapToRegistry   scope: '@types',
+50 silly mapToRegistry   escapedName: '@types%2fdrawflow',
+50 silly mapToRegistry   name: '@types/drawflow',
+50 silly mapToRegistry   rawSpec: '',
+50 silly mapToRegistry   spec: 'latest',
+50 silly mapToRegistry   type: 'tag' }
+51 silly mapToRegistry uri https://registry.npmjs.org/@types%2fdrawflow
+52 verbose addNameTag registry:https://registry.npmjs.org/@types%2fdrawflow not in flight; fetching
+53 verbose get https://registry.npmjs.org/@types%2fdrawflow not expired, no request
+54 silly addNameTag next cb for @types/drawflow with tag latest
+55 silly addNamed @types/drawflow@0.0.11
+56 verbose addNamed "0.0.11" is a plain semver version for @types/drawflow
+57 silly mapToRegistry name @types/drawflow
+58 silly mapToRegistry scope (from package name) @types
+59 verbose mapToRegistry no registry URL found in name for scope @types
+60 silly mapToRegistry using default registry
+61 silly mapToRegistry registry https://registry.npmjs.org/
+62 silly mapToRegistry data Result {
+62 silly mapToRegistry   raw: '@types/drawflow',
+62 silly mapToRegistry   scope: '@types',
+62 silly mapToRegistry   escapedName: '@types%2fdrawflow',
+62 silly mapToRegistry   name: '@types/drawflow',
+62 silly mapToRegistry   rawSpec: '',
+62 silly mapToRegistry   spec: 'latest',
+62 silly mapToRegistry   type: 'tag' }
+63 silly mapToRegistry uri https://registry.npmjs.org/@types%2fdrawflow
+64 verbose addRemoteTarball https://registry.npmjs.org/@types/drawflow/-/drawflow-0.0.11.tgz not in flight; adding
+65 verbose addRemoteTarball [ 'https://registry.npmjs.org/@types/drawflow/-/drawflow-0.0.11.tgz',
+65 verbose addRemoteTarball   'd130a6b4f5908620c05801fdca7eb2af3e01cb21' ]
+66 info retry fetch attempt 1 at 11:34:20 AM
+67 info attempt registry request try #1 at 11:34:20 AM
+68 http fetch GET https://registry.npmjs.org/@types/drawflow/-/drawflow-0.0.11.tgz
+69 http fetch 200 https://registry.npmjs.org/@types/drawflow/-/drawflow-0.0.11.tgz
+70 silly fetchAndShaCheck shasum d130a6b4f5908620c05801fdca7eb2af3e01cb21
+71 verbose addTmpTarball /tmp/npm-1338991-82a1b092/registry.npmjs.org/_40types/drawflow/-/drawflow-0.0.11.tgz not in flight; adding
+72 verbose addTmpTarball already have metadata; skipping unpack for @types/drawflow@0.0.11
+73 verbose correctMkdir /home/mbautista/.npm correctMkdir not in flight; initializing
+74 silly cache afterAdd @types/drawflow@0.0.11
+75 verbose afterAdd /home/mbautista/.npm/@types/drawflow/0.0.11/package/package.json not in flight; writing
+76 verbose correctMkdir /home/mbautista/.npm correctMkdir not in flight; initializing
+77 verbose afterAdd /home/mbautista/.npm/@types/drawflow/0.0.11/package/package.json written
+78 silly loadAllDepsIntoIdealTree Finishing
+79 silly loadIdealTree Finishing
+80 silly currentTree s-adl-architecture
+80 silly currentTree ├── ansi-regex@6.0.1
+80 silly currentTree ├── emoji-regex@10.3.0
+80 silly currentTree ├── get-east-asian-width@1.2.0
+80 silly currentTree ├── string-width@7.1.0
+80 silly currentTree └── strip-ansi@7.1.0
+81 silly idealTree s-adl-architecture
+81 silly idealTree ├── @types/drawflow@0.0.11
+81 silly idealTree ├── ansi-regex@6.0.1
+81 silly idealTree ├── emoji-regex@10.3.0
+81 silly idealTree ├── get-east-asian-width@1.2.0
+81 silly idealTree ├── string-width@7.1.0
+81 silly idealTree └── strip-ansi@7.1.0
+82 silly generateActionsToTake Starting
+83 silly install generateActionsToTake
+84 silly generateActionsToTake Finishing
+85 silly diffTrees action count 1
+86 silly diffTrees add @types/drawflow@0.0.11
+87 silly decomposeActions action count 8
+88 silly decomposeActions fetch @types/drawflow@0.0.11
+89 silly decomposeActions extract @types/drawflow@0.0.11
+90 silly decomposeActions test @types/drawflow@0.0.11
+91 silly decomposeActions preinstall @types/drawflow@0.0.11
+92 silly decomposeActions build @types/drawflow@0.0.11
+93 silly decomposeActions install @types/drawflow@0.0.11
+94 silly decomposeActions postinstall @types/drawflow@0.0.11
+95 silly decomposeActions finalize @types/drawflow@0.0.11
+96 silly runTopLevelLifecycles Starting
+97 silly executeActions Starting
+98 silly install executeActions
+99 silly doSerial global-install 0
+100 silly doParallel fetch 1
+101 verbose correctMkdir /home/mbautista/.npm/_locks correctMkdir not in flight; initializing
+102 verbose lock using /home/mbautista/.npm/_locks/staging-8f83483fdc40e1a5.lock for /mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging
+103 silly doParallel extract 1
+104 silly extract @types/drawflow@0.0.11
+105 verbose unbuild node_modules/.staging/@types/drawflow-1f483537
+106 silly gentlyRm /mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging/@types/drawflow-1f483537 is being purged from base /mnt/homeGPU/mbautista/s-adl-architecture
+107 verbose gentlyRm don't care about contents; nuking /mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging/@types/drawflow-1f483537
+108 verbose tar unpack /home/mbautista/.npm/@types/drawflow/0.0.11/package.tgz
+109 verbose tar unpacking to /mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging/@types/drawflow-1f483537
+110 silly gentlyRm /mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging/@types/drawflow-1f483537 is being purged
+111 verbose gentlyRm don't care about contents; nuking /mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging/@types/drawflow-1f483537
+112 silly gunzTarPerm modes [ '775', '664' ]
+113 silly gunzTarPerm extractEntry
+114 silly gunzTarPerm modified mode [ '', 493, 509 ]
+115 silly gunzTarPerm extractEntry
+116 silly gunzTarPerm modified mode [ '', 420, 436 ]
+117 silly gunzTarPerm extractEntry
+118 silly gunzTarPerm modified mode [ '', 420, 436 ]
+119 silly gunzTarPerm extractEntry
+120 silly gunzTarPerm modified mode [ '', 420, 436 ]
+121 silly gunzTarPerm extractEntry
+122 silly gunzTarPerm modified mode [ '', 420, 436 ]
+123 verbose unlock done using /home/mbautista/.npm/_locks/staging-8f83483fdc40e1a5.lock for /mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging
+124 silly rollbackFailedOptional Starting
+125 silly rollbackFailedOptional Finishing
+126 silly runTopLevelLifecycles Finishing
+127 silly install printInstalled
+128 warn enoent ENOENT: no such file or directory, open '/mnt/homeGPU/mbautista/s-adl-architecture/package.json'
+129 verbose enoent ENOENT: no such file or directory, open '/mnt/homeGPU/mbautista/s-adl-architecture/package.json'
+129 verbose enoent This is most likely not a problem with npm itself
+129 verbose enoent and is related to npm not being able to find a file.
+130 warn s-adl-architecture No description
+131 verbose If you need help, you may report this error at:
+131 verbose     <https://github.com/npm/npm/issues>
+132 warn s-adl-architecture No repository field.
+133 verbose If you need help, you may report this error at:
+133 verbose     <https://github.com/npm/npm/issues>
+134 warn s-adl-architecture No README data
+135 verbose If you need help, you may report this error at:
+135 verbose     <https://github.com/npm/npm/issues>
+136 warn s-adl-architecture No license field.
+137 verbose If you need help, you may report this error at:
+137 verbose     <https://github.com/npm/npm/issues>
+138 verbose stack Error: ENOTDIR: not a directory, open '/mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging/@types/drawflow-1f483537/package.json'
+138 verbose stack     at Error (native)
+139 verbose cwd /mnt/homeGPU/mbautista/s-adl-architecture/S-ADL-API
+140 error Linux 5.15.0-91-lowlatency
+141 error argv "/mnt/homeGPU/mbautista/s-adl-soft-lib/bin/node" "/mnt/homeGPU/mbautista/s-adl-soft-lib/bin/npm" "install" "-D" "@types/drawflow"
+142 error node v6.13.1
+143 error npm  v3.10.10
+144 error path /mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging/@types/drawflow-1f483537/package.json
+145 error code ENOTDIR
+146 error errno -20
+147 error syscall open
+148 error ENOTDIR: not a directory, open '/mnt/homeGPU/mbautista/s-adl-architecture/node_modules/.staging/@types/drawflow-1f483537/package.json'
+149 error If you need help, you may report this error at:
+149 error     <https://github.com/npm/npm/issues>
+150 verbose exit [ -20, true ]
