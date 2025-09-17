@@ -45,7 +45,11 @@ async def get_sklearn_algorithms():
 
 @router.get("/static_data/datasets", tags=["static_data"])
 async def get_datasets():
-    return list(datasets.keys())
+    filtered_datasets = []
+    for key,value in datasets.items():
+        if 'url' not in value[0].__name__:
+            filtered_datasets.append(key)
+    return filtered_datasets
 
 @router.get("/static_data/preprocessing", tags=["static_data"])
 async def get_preprocessing():

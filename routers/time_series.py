@@ -58,7 +58,11 @@ async def get_transformers_algorithms():
 
 @router.get("/time_series/datasets", tags=["time_series"])
 async def get_datasets():
-    return list(datasets.keys())
+    filtered_datasets = []
+    for key,value in datasets.items():
+        if 'url' not in value[0].__name__ and value[0].__name__!= 'load_gas_sensor_dataset':
+            filtered_datasets.append(key)
+    return filtered_datasets
 
 
 @router.get("/time_series/preprocessing", tags=["time_series"])

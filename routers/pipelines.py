@@ -33,9 +33,15 @@ from SADL.time_series.time_series_utils import TimeSeriesProcessor
 
 import numpy as np
 import torch
-
-
 from torch.utils.data import Dataset
+from TSFEDL.models_pytorch import (
+    OhShuLih_Forecaster, YiboGao_Forecaster, LihOhShu_Forecaster, YaoQihang_Forecaster,
+    HtetMyetLynn_Forecaster, YildirimOzal_Forecaster, CaiWenjuan_Forecaster, ZhangJin_Forecaster,
+    KongZhengmin_Forecaster, WeiXiaoyan_Forecaster, GaoJunLi_Forecaster, KhanZulfiqar_Forecaster,
+    ZhengZhenyu_Forecaster, WangKejun_Forecaster, ChenChen_Forecaster, KimTaeYoung_Forecaster,
+    GenMinxing_Forecaster, FuJiangmeng_Forecaster, ShiHaotian_Forecaster, HuangMeiLing_Forecaster,
+    HongTan_Forecaster, SharPar_Forecaster, DaiXiLi_Forecaster
+)
 
 class PermuteDataset(Dataset):
     def __init__(self, X, y):
@@ -70,7 +76,31 @@ class topModuleTSFEDL(torch.nn.Module):
             # Reshape to (batch_size, npred, out_features)
             out = out.reshape(out.shape[0], self.npred, -1)
         return out 
-
+top_modules_map = {
+    "ohshulih": OhShuLih_Forecaster,
+    "yibogao": YiboGao_Forecaster,
+    "liohshu": LihOhShu_Forecaster,
+    "yaoqihang": YaoQihang_Forecaster,
+    "htetmyetlynn": HtetMyetLynn_Forecaster,
+    "yildirimozal": YildirimOzal_Forecaster,
+    "caiwenjuan": CaiWenjuan_Forecaster,
+    "zhangjin": ZhangJin_Forecaster,
+    "kongzhengmin": KongZhengmin_Forecaster,
+    "weixiaoyan": WeiXiaoyan_Forecaster,
+    "gaojunli": GaoJunLi_Forecaster,
+    "khanzulfiqar": KhanZulfiqar_Forecaster,
+    "zhengzhenyu": ZhengZhenyu_Forecaster,
+    "wangkejun": WangKejun_Forecaster,
+    "chenchen": ChenChen_Forecaster,
+    "kimtaeyoung": KimTaeYoung_Forecaster,
+    "genminxing": GenMinxing_Forecaster,
+    "fujiangmeng": FuJiangmeng_Forecaster,
+    "shihaotian": ShiHaotian_Forecaster,
+    "huangmeiling": HuangMeiLing_Forecaster,
+    "hongtan": HongTan_Forecaster,
+    "sharpar": SharPar_Forecaster,
+    "daixili": DaiXiLi_Forecaster
+}    
 
 router = APIRouter()
 
@@ -117,29 +147,42 @@ async def run_pipeline(request: Request):
             print(f"Loading dataset: {params}")
 
             if(node_category == "static_data"):
-                data = global_load_static(params["dataset"])
+                # data = global_load_static(params["dataset"])
 
-                if isinstance(data, tuple):
-                    if len(data) == 2:
-                        X, y = data
-                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
-                    elif len(data) == 4:
-                        X_train, X_test, y_train, y_test = data
-                context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
+                # if isinstance(data, tuple):
+                #     if len(data) == 2:
+                #         X, y = data
+                #         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
+                #     elif len(data) == 4:
+                #         X_train, X_test, y_train, y_test = data
+                # context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
+               
+                raw_data = global_load_static(params["dataset"])
+                context[node_id] = process_dataset_output(raw_data)
 
-            elif(node_category == "time_series"):
-                # Placeholder for time series dataset loading logic
-                if params["dataset"] == "ai4i_2020_predictive_maintenance_dataset": #TODO: Change for different datasets
-                    X, y = global_load_ts(params["dataset"])
-                    y = y["Machine failure"]
-                    X = X.drop('Type',axis=1)  # remove Type or apply one hot encoding
+            # elif(node_category == "time_series"):
+            #     # Placeholder for time series dataset loading logic
+            #     if params["dataset"] == "ai4i_2020_predictive_maintenance_dataset": #TODO: Change for different datasets
+            #         X, y = global_load_ts(params["dataset"])
+            #         y = y["Machine failure"]
+            #         X = X.drop('Type',axis=1)  # remove Type or apply one hot encoding
                     
-                context[node_id] = {"X_train": X, "y_train": y}
-           
+            #     context[node_id] = {"X_train": X, "y_train": y}
+            elif node_category == "time_series":
+                raw_data = global_load_ts(params["dataset"])
+
+                # Limpieza específica si aplica
+                if params["dataset"] == "ai4i_2020_predictive_maintenance_dataset":
+                    X, y = raw_data
+                    y = y["Machine failure"]
+                    X = X.drop("Type", axis=1)
+                    raw_data = (X, y)
+
+                context[node_id] = process_dataset_output(raw_data)
 
             
             print(f"Dataset loaded: {params['dataset']}")
-
+            
 
         elif node_type == "Preprocessing":
             print(f"Preprocessing...{model_type}")
@@ -184,7 +227,7 @@ async def run_pipeline(request: Request):
             print(f"Preprocessing done: {scaler_instance}")
 
         elif node_type == "Model Setup":
-            print(f"Setting up model: {params['algorithm_']}")
+            print(f"Setting up model: {params['algorithm_']}")      
 
             predecessors = get_predecessors(node_id, edges)
             prev_node_id = predecessors[0]
@@ -219,26 +262,54 @@ async def run_pipeline(request: Request):
 
             elif(params['algorithm_'] in tsfedl_algorithms):
                 kwargs = params
+                # NEWWWWWWWW
+                # Obtener clase del top module según el algoritmo
+                top_class = top_modules_map.get(params['algorithm_'])
 
-                #Set TSFEDL specific parameters
-                in_features_ = int(kwargs["in_features_topmodule"])
-                out_features_ = int(kwargs["out_features_topmodule"])
-                if "in_features_topmodule" in kwargs and "out_features_topmodule" in kwargs:
-                    kwargs["top_module"] = topModuleTSFEDL(in_features=in_features_, out_features=out_features_)
-                if "in_features" in kwargs:
-                    kwargs["in_features"] = int(kwargs["in_features"])
-                kwargs.pop("in_features_topmodule", None)
-                kwargs.pop("out_features_topmodule", None)
-                if "loss" in kwargs:
-                    kwargs["loss"] = torch.nn.MSELoss()
-                if "input_shape" in kwargs:
-                    kwargs["input_shape"] = (126,126)
-                
+                # Extraer parámetros del top module
+                in_features_top = int(kwargs.pop("in_features_topmodule", 0))
+                out_features_top = int(kwargs.pop("out_features_topmodule", 0))
+                n_pred = 1 # kwargs.get("n_pred", 1)  # configurable desde frontend
+
+                # Asignar top_module dinámicamente
+                if top_class and in_features_top and out_features_top:
+                    kwargs["top_module"] = top_class(out_features=out_features_top, n_pred=n_pred)
+
+                # Ajustar parámetros generales
+                kwargs["in_features"] = int(kwargs.get("in_features", 0)) if "in_features" in kwargs else None
+                kwargs["loss"] = torch.nn.MSELoss()
+                kwargs["max_epochs"] = kwargs.get("max_epochs", 1)  # configurable desde frontend
+
                 print(f"kwargs before initialization: {kwargs}")
 
+                X_train, X_test, y_train, y_test = train_test_split(            # Cambiar 
+                    X, prev_output["y_train"], test_size=0.2, random_state=42
+                )
+
+                # Creación de ventanas temporales
+                processor = TimeSeriesProcessor(window_size=24, step_size=1, future_prediction=False, n_pred=n_pred)
+                X_train_w, y_train_w, X_test_w, y_test_w = processor.process_train_test(X_train, y_train, X_test, y_test)
+
+                # Conversión a tensores
+                X_train_w = torch.tensor(X_train_w, dtype=torch.float32)
+                y_train_w = torch.tensor(y_train_w, dtype=torch.float32).unsqueeze(-1)  # -> (N, 24, 1)
+                X_test_w = torch.tensor(X_test_w, dtype=torch.float32)
+                y_test_w = torch.tensor(y_test_w, dtype=torch.float32).unsqueeze(-1)
+
+                # Inicializar y entrenar modelo
                 model = tsfedl.TsfedlAnomalyDetection(**kwargs)
-                print(f"Model initialized: {model}")
-                model.fit(prev_output.get("train_loader", None))
+                model.fit(X_train_w, y_train_w, batch_size=3)
+
+                # Guardar resultados en el contexto
+                context[node_id].update({
+                    "X_train_windows": X_train_w,
+                    "X_test_windows": X_test_w,
+                    "y_train_windows": y_train_w,
+                    "y_test_windows": y_test_w,
+                    "X_test": X_test,
+                    "y_test": y_test
+                })
+
 
             elif(params['algorithm_'] in flexanomalies_algorithms):
                 kwargs = params
@@ -256,6 +327,7 @@ async def run_pipeline(request: Request):
 
             elif(params['algorithm_'] in transformers_algorithms):
                 kwargs = params
+                
                 # Set Transformers specific parameters
                 kwargs["label_parser"] = None
                 kwargs['train_epochs'] = 1
@@ -264,6 +336,7 @@ async def run_pipeline(request: Request):
                 # Set Tranformers train loader
                 scaler = StandardScalerPreprocessing()
                 X_scaled = scaler.fit_transform(X)
+                print("Aqui")
                 X_train, X_test, y_train, y_test = train_test_split(X_scaled, prev_output["y_train"], test_size=0.2, random_state=42)
 
                 processor = TimeSeriesProcessor(window_size=kwargs["seq_len"], step_size=1,future_prediction=False)
@@ -455,3 +528,69 @@ async def run_pipeline(request: Request):
         #Once node is processed, store its data for the next iteration
         prev_node = node
     return results_dict
+
+
+
+def process_dataset_output(data, test_size=0.2, random_state=42):
+    """
+    Normaliza las distintas salidas de loaders a un formato uniforme.
+    Siempre devuelve un diccionario con train/test.
+
+    Parameters:
+    - data: salida del loader original
+    - test_size: tamaño del split para train/test si no está dado
+    - random_state: semilla
+
+    Returns:
+    dict con {X_train, X_test, y_train, y_test, metadata}
+    """
+    result = {"metadata": {}}
+
+    if isinstance(data, tuple):
+        if len(data) == 2:
+            # Caso: (X, y)  --> y puede ser None
+            X, y = data
+            if y is None:
+                # Solo se parte X en train/test
+                X_train, X_test = train_test_split(
+                    X, test_size=test_size, random_state=random_state
+                )
+                result.update({
+                    "X_train": X_train, "X_test": X_test,
+                    "y_train": None, "y_test": None
+                })
+                print("Entroooooo") 
+                
+            else:
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=test_size, stratify=y,
+                    random_state=random_state
+                )
+                result.update({
+                    "X_train": X_train, "X_test": X_test,
+                    "y_train": y_train, "y_test": y_test
+                })
+        elif len(data) == 4:
+            # Caso: (X_train, X_test, y_train, y_test)
+            X_train, X_test, y_train, y_test = data
+            result.update({
+                "X_train": X_train, "X_test": X_test,
+                "y_train": y_train, "y_test": y_test
+            })
+        elif len(data) == 3:
+            # Caso especial (data, attack_types, attack_class) -> KDDCup99
+            X, attack_types, y = data
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=test_size, stratify=y, random_state=random_state
+            )
+            result.update({
+                "X_train": X_train, "X_test": X_test,
+                "y_train": y_train, "y_test": y_test,
+                "metadata": {"attack_types": attack_types}
+            })
+        else:
+            raise ValueError(f"Unsupported format: {len(data)} elements.")
+    else:
+        raise TypeError(f"Unexpected output type: {type(data)}")
+
+    return result
