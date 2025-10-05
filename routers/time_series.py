@@ -58,7 +58,11 @@ async def get_transformers_algorithms():
 
 @router.get("/time_series/datasets", tags=["time_series"])
 async def get_datasets():
-    return list(datasets.keys())
+    filtered_datasets = []
+    for key,value in datasets.items():
+        if 'url' not in value[0].__name__ and value[0].__name__!= 'load_gas_sensor_dataset':
+            filtered_datasets.append(key)
+    return filtered_datasets
 
 
 @router.get("/time_series/preprocessing", tags=["time_series"])
@@ -76,6 +80,8 @@ async def get_params(_model: str):
         #Set or modify some specific parameters for tsfedl
         kwargs["in_features_topmodule"] = "REQUIRED"
         kwargs["out_features_topmodule"] = "REQUIRED"
+        kwargs["max_epochs"] =  "REQUIRED"    # Nuevo
+        kwargs["batch_size"] =  "REQUIRED"    # Nuevo
         if "loss" in kwargs:
             kwargs["loss"] = "torch.nn.MSELoss()"
         if "optimizer" in kwargs:
@@ -84,6 +90,9 @@ async def get_params(_model: str):
             kwargs["input_shape"] = "(126,126)"
     elif _model in transformers_algorithms:
         kwargs = obtener_parametros(_model, "transformers")
+        #Set or modify some specific parameters for transformers
+        kwargs["train_epochs"] =  "REQUIRED"       #Nuevo
+        kwargs["batch_size"] =  "REQUIRED" 
         print(f"kwargs transformers: {kwargs}")
     return kwargs
 
