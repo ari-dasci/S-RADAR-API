@@ -25,7 +25,7 @@ from SADL.static_data.preprocessing.preprocessing_static import preprocessing_st
 from SADL.time_series.preprocessing.preprocessing_ts import preprocessing_ts_algorithms
 
 # Visualization
-from SADL.visualization_module import DataVisualization
+from SADL.visualization_module import DataVisualization,DataVisualizationScoresTS
 
 
 from SADL.time_series.preprocessing.preprocessing_ts import StandardScalerPreprocessing
@@ -112,9 +112,12 @@ async def run_pipeline(request: Request):
     data = await request.json()
     print(f"Received data: {data}")
 
+    timeseries_visualization = any([n['category']=='time_series' for n in data['nodes']])
+    federated_visualizacion = any([n['category']=='federated_data' for n in data['nodes']])
     nodes = {node["id"]: node for node in data["nodes"]}
     edges = data["edges"]
-
+    deepModel = False
+    
     # Step 1: Build graph and sort topologically
     G = nx.DiGraph()
     for node_id in nodes:
@@ -158,7 +161,7 @@ async def run_pipeline(request: Request):
                 # context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
                
                 raw_data = global_load_static(params["dataset"])
-                context[node_id] = process_dataset_output(raw_data)
+                context[node_id] = process_dataset_static(raw_data)
 
             # elif(node_category == "time_series"):
             #     # Placeholder for time series dataset loading logic
@@ -168,17 +171,10 @@ async def run_pipeline(request: Request):
             #         X = X.drop('Type',axis=1)  # remove Type or apply one hot encoding
                     
             #     context[node_id] = {"X_train": X, "y_train": y}
+            
             elif node_category == "time_series":
-                raw_data = global_load_ts(params["dataset"])
-
-                # Limpieza específica si aplica
-                if params["dataset"] == "ai4i_2020_predictive_maintenance_dataset":
-                    X, y = raw_data
-                    y = y["Machine failure"]
-                    X = X.drop("Type", axis=1)
-                    raw_data = (X, y)
-
-                context[node_id] = process_dataset_output(raw_data)
+                data = global_load_ts(params["dataset"])
+                context[node_id] = process_dataset_ts(data, params["dataset"])
 
             
             print(f"Dataset loaded: {params['dataset']}")
@@ -252,7 +248,7 @@ async def run_pipeline(request: Request):
                 kwargs = params
                 model = pyod.PyodAnomalyDetection(**kwargs)
                 print(f"Model initialized: {model}")
-                model.fit(X)
+                model.fit(X.astype(np.float64) )
 
             elif(params['algorithm_'] in sklearn_algorithms):
                 kwargs = params
@@ -269,7 +265,7 @@ async def run_pipeline(request: Request):
                 # Extraer parámetros del top module
                 in_features_top = int(kwargs.pop("in_features_topmodule", 0))
                 out_features_top = int(kwargs.pop("out_features_topmodule", 0))
-                n_pred = 1 # kwargs.get("n_pred", 1)  # configurable desde frontend
+                n_pred = 1 #int(kwargs.pop("n_pred_topmodule", 1))  # configurable desde frontend
 
                 # Asignar top_module dinámicamente
                 if top_class and in_features_top and out_features_top:
@@ -279,6 +275,7 @@ async def run_pipeline(request: Request):
                 kwargs["in_features"] = int(kwargs.get("in_features", 0)) if "in_features" in kwargs else None
                 kwargs["loss"] = torch.nn.MSELoss()
                 kwargs["max_epochs"] = kwargs.get("max_epochs", 1)  # configurable desde frontend
+                
 
                 print(f"kwargs before initialization: {kwargs}")
 
@@ -298,7 +295,7 @@ async def run_pipeline(request: Request):
 
                 # Inicializar y entrenar modelo
                 model = tsfedl.TsfedlAnomalyDetection(**kwargs)
-                model.fit(X_train_w, y_train_w, batch_size=3)
+                model.fit(X_train_w, y_train_w)
 
                 # Guardar resultados en el contexto
                 context[node_id].update({
@@ -311,32 +308,59 @@ async def run_pipeline(request: Request):
                 })
 
 
+
             elif(params['algorithm_'] in flexanomalies_algorithms):
                 kwargs = params
                 print(  f"kwargs before initialization flexanomalies: {kwargs}")
                 # Set FlexAnomalies specific parameters
                 #kwargs["n_clients"] = 15
-                kwargs["n_rounds"] = 5
-
-                if "input_shape" in kwargs:
+                #kwargs["n_rounds"] = 10
+                
+                if "input_dim" in kwargs:
                     kwargs["input_dim"] = X.shape[1]
+                    
+                if timeseries_visualization:
+                    # Set Tranformers train loader
+                    if "preprocess" in kwargs:
+                        kwargs["preprocess"] = False
+                        processor = TimeSeriesProcessor(window_size= kwargs["w_size"], step_size=1, future_prediction=False)
+                        X_train_windows, y_train_windows, X_test_windows, y_test_windows = processor.process_train_test(prev_output["X_train"], prev_output["y_train"], prev_output["X_test"], prev_output["y_test"])
+                    else:
+                        processor =   TimeSeriesProcessor(window_size= kwargs["w_size"], step_size=1, future_prediction=True, n_pred=kwargs["n_pred"])
+                        X_train_windows, y_train_windows, X_test_windows, y_test_windows, l_test_windows = processor.process_train_test(prev_output["X_train"], prev_output["y_train"], prev_output["X_test"], prev_output["y_test"],l_test=prev_output["y_test"])
+                        deepModel = True
+                    
+                    model = flexanomalies.FlexAnomalyDetection(**kwargs)
+                    print(f"Model initialized: {model}")
+                    model.fit(X_train_windows,y_train_windows)
+                    
+                    context[node_id].update({
+                    "X_train_windows": X_train_windows,
+                    "X_test_windows": X_test_windows,
+                    "y_train_windows": y_train_windows,
+                    "y_test_windows": y_test_windows,
+                    })
+                    
+                else:
+                                 
+                    model = flexanomalies.FlexAnomalyDetection(**kwargs)
+                    print(f"Model initialized: {model}")
+                    model.fit(X, prev_output.get("y_train", None))
 
-                model = flexanomalies.FlexAnomalyDetection(**kwargs)
-                print(f"Model initialized: {model}")
-                model.fit(X, prev_output.get("y_train", None))
+
 
             elif(params['algorithm_'] in transformers_algorithms):
                 kwargs = params
                 
                 # Set Transformers specific parameters
                 kwargs["label_parser"] = None
-                kwargs['train_epochs'] = 1
-                kwargs['batch_size']= 16
                 kwargs['lr']= 0.001
+                kwargs['train_epochs'] = kwargs.get("train_epochs", 1)
+                kwargs['batch_size']= kwargs.get("batch_size", 16) #16
+                
                 # Set Tranformers train loader
                 scaler = StandardScalerPreprocessing()
                 X_scaled = scaler.fit_transform(X)
-                print("Aqui")
                 X_train, X_test, y_train, y_test = train_test_split(X_scaled, prev_output["y_train"], test_size=0.2, random_state=42)
 
                 processor = TimeSeriesProcessor(window_size=kwargs["seq_len"], step_size=1,future_prediction=False)
@@ -383,8 +407,11 @@ async def run_pipeline(request: Request):
                 X_train = prev_output.get("X_train")
             if "X_test_windows" in prev_output:
                 X_train = prev_output.get("X_test_windows")
-
-            scores_pred = model.decision_function(X_train)* -1
+                
+            if deepModel:
+                    scores_pred = model.decision_function(X_train, prev_output.get("y_test_windows"))
+            else:        
+                    scores_pred = model.decision_function(X_train)* -1
             print("Scores",scores_pred)
             # Add scores_pred to previous context, preserving other keys
             context[node_id] = {**prev_output, "data": scores_pred}
@@ -417,8 +444,12 @@ async def run_pipeline(request: Request):
                 model = prev_output["model"]
             if model is None:
                 return {"message": f"Error: (Predict) Model not set up before prediction."}
-
-            pred = model.predict(X)
+            
+            
+            if deepModel:
+                pred = model.predict(X,prev_output["y_test_windows"]) 
+            else:   
+                pred = model.predict(X)
             # Add scores_pred to previous context, preserving other keys
             context[node_id] = {**prev_output, "data": pred}
 
@@ -487,14 +518,23 @@ async def run_pipeline(request: Request):
             elif prev_node["op_type"] == "Predict Model":
                 data_to_plot = prev_output["X_test"]
                 clean_params = {k: v for k, v in params.items() if v not in [None, "", [], "plot"]}
-                if prev_output.get("y_train_windows") is not None: #Transformer values
-                    print("MME MEETOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
-                    print(prev_output["X_test"])
-                    model = prev_output["model"]
-                    model.evaluate(prev_output.get("X_test_windows"),prev_output.get("y_test_windows"))
-                    pred = model.labels_preds
-                    true = np.array(prev_output.get("y_test")).ravel()
+               
+                # if prev_output.get("y_train_windows") is not None: #Transformer values
+                #     print("MME MEETOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+                #     print(prev_output["X_test"])
+                #     model = prev_output["model"]
+                #     model.evaluate(prev_output.get("X_test_windows"),prev_output.get("y_test_windows"))
+                #     pred = model.labels_preds
+                #     true = np.array(prev_output.get("y_test")).ravel()
+                # else:
+                
+                if federated_visualizacion:
+                     pred =  prev_output["model"].model.labels_       #labels 
+                     true = np.array(prev_output["y_test"]).flatten()   #labels
+                     print("Entreeeeeee")
+                      
                 else:
+                    
                     true = np.array(prev_output["y_test"]).flatten()
                     pred = np.array(prev_output["data"]).astype(int)
                 
@@ -509,13 +549,30 @@ async def run_pipeline(request: Request):
                 if "subset_size_percent" in clean_params:       
                     clean_params["subset_size_percent"] = float(clean_params["subset_size_percent"])
                 
-                print(f"Creating visualization for node {node_id} with params: {clean_params}")
-                vis = DataVisualization(data_to_plot, **clean_params) 
-                vis.fit()  
-                json_fig = vis.to_json()    
-                visualizations[node_id] = json_fig
-                # Store visualizations in results
-                results_dict["visualizations"] = visualizations
+                #NUEVO
+               
+                if timeseries_visualization:
+                    print(f"Creating visualization for node {node_id} in  {node_category}  with params: {clean_params}")
+                    model = prev_output["model"]
+                    if deepModel:
+                        scores = model.decision_function(prev_output.get("X_test_windows"),prev_output.get("y_test_windows"))
+                    else:   
+                        scores = model.decision_function(prev_output.get("X_test_windows"))
+                        
+                    vis = DataVisualizationScoresTS(scores.ravel())
+                    json_fig = vis.to_json()    
+                    visualizations[node_id] = json_fig
+                    # Store visualizations in results
+                    results_dict["visualizations"] = visualizations 
+                    
+                else:    
+                    vis = DataVisualization(data_to_plot, **clean_params) 
+                    vis.fit()  
+                    json_fig = vis.to_json()    
+                    visualizations[node_id] = json_fig
+                    # Store visualizations in results
+                    print(f"Created visualization for node {node_id}  in  {node_category} with params: {clean_params}")
+                    results_dict["visualizations"] = visualizations
                 
             else: 
                 return {"message": f"Error: (Visualization) Previous node is not a valid source for visualization."}
@@ -527,11 +584,12 @@ async def run_pipeline(request: Request):
         
         #Once node is processed, store its data for the next iteration
         prev_node = node
+    print(timeseries_visualization)
     return results_dict
 
 
 
-def process_dataset_output(data, test_size=0.2, random_state=42):
+def process_dataset_static(data, test_size=0.2, random_state=42):
     """
     Normaliza las distintas salidas de loaders a un formato uniforme.
     Siempre devuelve un diccionario con train/test.
@@ -594,3 +652,41 @@ def process_dataset_output(data, test_size=0.2, random_state=42):
         raise TypeError(f"Unexpected output type: {type(data)}")
 
     return result
+
+def process_dataset_ts(data, dataset_name, test_size=0.2, random_state=42):
+    """
+   Adjusts X and y according to the specific dataset and returns the split in train/test.
+    """
+    X, y = data
+
+    # Specific rules per dataset
+    rules = {
+        "ai4i_2020_predictive_maintenance_dataset": lambda X, y: (X.drop("Type", axis=1), y["Machine failure"]),
+        "power_consumption_of_tetouan_city": lambda X, y: (X.drop("DateTime", axis=1), y["Zone 1 Power Consumption"]),
+        "individual_household_electric_power_consumption": lambda X, y: (X.drop(["Date", "Time"], axis=1),X["Global_active_power"]),
+        "metro_interstate_traffic_volume": lambda X, y: (X.drop(["date_time", "holiday","weather_main","weather_description"], axis=1),y["traffic_volume"]),
+       
+    }
+
+
+
+    if dataset_name in rules:
+        X, y = rules[dataset_name](X, y)
+
+    # Split
+    if y is None:
+        X_train, X_test = train_test_split(
+            X, test_size=test_size, random_state=random_state
+        )
+        return {
+            "X_train": X_train, "X_test": X_test,
+            "y_train": None, "y_test": None
+        }
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state
+        )
+        return {
+            "X_train": X_train, "X_test": X_test,
+            "y_train": y_train, "y_test": y_test
+        }

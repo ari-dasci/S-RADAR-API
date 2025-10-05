@@ -80,6 +80,8 @@ async def get_params(_model: str):
         #Set or modify some specific parameters for tsfedl
         kwargs["in_features_topmodule"] = "REQUIRED"
         kwargs["out_features_topmodule"] = "REQUIRED"
+        kwargs["max_epochs"] =  "REQUIRED"    # Nuevo
+        kwargs["batch_size"] =  "REQUIRED"    # Nuevo
         if "loss" in kwargs:
             kwargs["loss"] = "torch.nn.MSELoss()"
         if "optimizer" in kwargs:
@@ -88,6 +90,9 @@ async def get_params(_model: str):
             kwargs["input_shape"] = "(126,126)"
     elif _model in transformers_algorithms:
         kwargs = obtener_parametros(_model, "transformers")
+        #Set or modify some specific parameters for transformers
+        kwargs["train_epochs"] =  "REQUIRED"       #Nuevo
+        kwargs["batch_size"] =  "REQUIRED" 
         print(f"kwargs transformers: {kwargs}")
     return kwargs
 
