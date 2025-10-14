@@ -3,9 +3,9 @@ from inspect import signature
 import numpy as np
 from fastapi import APIRouter, HTTPException,Request
 
-from SADL.federated_data.algorithms import get_algorithms as ga
-from SADL.federated_data.algorithms import flexanomalies as flexanomalies
-from SADL.federated_data.algorithms.flexanomalies import flexanomalies_algorithms
+from RADAR.federated_data.algorithms import get_algorithms as ga
+from RADAR.federated_data.algorithms import flexanomalies as flexanomalies
+from RADAR.federated_data.algorithms.flexanomalies import flexanomalies_algorithms
 
 
 

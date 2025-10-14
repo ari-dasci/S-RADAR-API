@@ -5,15 +5,15 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 import json
 
-from SADL.static_data import get_categories as gc
-from SADL.static_data.algorithms import get_algorithms as ga
-from SADL.static_data.algorithms.pyod import pyod_algorithms
-from SADL.static_data.algorithms.sklearn import sklearn_algorithms
-from SADL.static_data.static_datasets_uci import datasets
-from SADL.static_data.preprocessing.preprocessing_static import preprocessing_static_algorithms
+from RADAR.static_data import get_categories as gc
+from RADAR.static_data.algorithms import get_algorithms as ga
+from RADAR.static_data.algorithms.pyod import pyod_algorithms
+from RADAR.static_data.algorithms.sklearn import sklearn_algorithms
+from RADAR.static_data.static_datasets_uci import datasets
+from RADAR.static_data.preprocessing.preprocessing_static import preprocessing_static_algorithms
 
-from SADL.static_data.algorithms import pyod
-from SADL.static_data.algorithms import sklearn
+from RADAR.static_data.algorithms import pyod
+from RADAR.static_data.algorithms import sklearn
 
 router = APIRouter()
 
@@ -47,7 +47,7 @@ async def get_sklearn_algorithms():
 async def get_datasets():
     filtered_datasets = []
     for key,value in datasets.items():
-        if 'url' not in value[0].__name__:
+        if 'url' not in value[0].__name__ :
             filtered_datasets.append(key)
     return filtered_datasets
 

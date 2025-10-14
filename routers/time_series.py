@@ -1,13 +1,13 @@
 from inspect import signature
 from fastapi import APIRouter, HTTPException, Request
 
-from SADL.time_series.algorithms import get_algorithms as ga
-from SADL.time_series.algorithms.transformers import transformers_algorithms
-from SADL.time_series.algorithms.tsfedl import tsfedl_algorithms
-from SADL.time_series.algorithms import tsfedl as tsfedl
-from SADL.time_series.time_series_datasets_uci import datasets
-from SADL.time_series.preprocessing.preprocessing_ts import preprocessing_ts_algorithms
-from SADL.time_series.algorithms import transformers
+from RADAR.time_series.algorithms import get_algorithms as ga
+from RADAR.time_series.algorithms.transformers import transformers_algorithms
+from RADAR.time_series.algorithms.tsfedl import tsfedl_algorithms
+from RADAR.time_series.algorithms import tsfedl as tsfedl
+from RADAR.time_series.time_series_datasets_uci import datasets
+from RADAR.time_series.preprocessing.preprocessing_ts import preprocessing_ts_algorithms
+from RADAR.time_series.algorithms import transformers
 import torch
 
 class topModuleTDFEDL(torch.nn.Module):

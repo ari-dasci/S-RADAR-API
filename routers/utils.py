@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from SADL import get_components
+from RADAR import get_components
 
 router = APIRouter()
 

@@ -2,34 +2,34 @@ from inspect import signature
 from fastapi import APIRouter, HTTPException,Request
 from typing import Dict, Any
 import networkx as nx  # Use for topological sorting
-from SADL.static_data.static_datasets_uci import global_load as global_load_static
-from SADL.time_series.time_series_datasets_uci import global_load as global_load_ts
+from RADAR.static_data.static_datasets_uci import global_load as global_load_static
+from RADAR.time_series.time_series_datasets_uci import global_load as global_load_ts
 from sklearn.model_selection import train_test_split
 
 #Algoritm lists
-from SADL.static_data.algorithms.pyod import pyod_algorithms
-from SADL.static_data.algorithms.sklearn import sklearn_algorithms
-from SADL.time_series.algorithms.tsfedl import tsfedl_algorithms
-from SADL.federated_data.algorithms.flexanomalies import flexanomalies_algorithms
-from SADL.time_series.algorithms.transformers import transformers_algorithms
+from RADAR.static_data.algorithms.pyod import pyod_algorithms
+from RADAR.static_data.algorithms.sklearn import sklearn_algorithms
+from RADAR.time_series.algorithms.tsfedl import tsfedl_algorithms
+from RADAR.federated_data.algorithms.flexanomalies import flexanomalies_algorithms
+from RADAR.time_series.algorithms.transformers import transformers_algorithms
 
 #Models
-from SADL.static_data.algorithms import pyod
-from SADL.static_data.algorithms import sklearn
-from SADL.time_series.algorithms import tsfedl
-from SADL.federated_data.algorithms import flexanomalies
-from SADL.time_series.algorithms import transformers
+from RADAR.static_data.algorithms import pyod
+from RADAR.static_data.algorithms import sklearn
+from RADAR.time_series.algorithms import tsfedl
+from RADAR.federated_data.algorithms import flexanomalies
+from RADAR.time_series.algorithms import transformers
 
 #Preprocessing
-from SADL.static_data.preprocessing.preprocessing_static import preprocessing_static_algorithms
-from SADL.time_series.preprocessing.preprocessing_ts import preprocessing_ts_algorithms
+from RADAR.static_data.preprocessing.preprocessing_static import preprocessing_static_algorithms
+from RADAR.time_series.preprocessing.preprocessing_ts import preprocessing_ts_algorithms
 
 # Visualization
-from SADL.visualization_module import DataVisualization,DataVisualizationScoresTS
+from RADAR.visualization_module import DataVisualization,DataVisualizationScoresTS
 
 
-from SADL.time_series.preprocessing.preprocessing_ts import StandardScalerPreprocessing
-from SADL.time_series.time_series_utils import TimeSeriesProcessor
+from RADAR.time_series.preprocessing.preprocessing_ts import StandardScalerPreprocessing
+from RADAR.time_series.time_series_utils import TimeSeriesProcessor
 
 import numpy as np
 import torch
@@ -161,7 +161,7 @@ async def run_pipeline(request: Request):
                 # context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
                
                 raw_data = global_load_static(params["dataset"])
-                context[node_id] = process_dataset_static(raw_data)
+                context[node_id] = process_dataset_static(raw_data,params["dataset"])
 
             # elif(node_category == "time_series"):
             #     # Placeholder for time series dataset loading logic
@@ -589,7 +589,7 @@ async def run_pipeline(request: Request):
 
 
 
-def process_dataset_static(data, test_size=0.2, random_state=42):
+def process_dataset_static(data,name_data, test_size=0.2, random_state=42):
     """
     Normaliza las distintas salidas de loaders a un formato uniforme.
     Siempre devuelve un diccionario con train/test.
@@ -606,8 +606,14 @@ def process_dataset_static(data, test_size=0.2, random_state=42):
 
     if isinstance(data, tuple):
         if len(data) == 2:
-            # Caso: (X, y)  --> y puede ser None
+            # Caso: (X, y)  --> y maybe None
             X, y = data
+            
+            if name_data == "mammographic_mass":
+               mask = ~np.isnan(X).any(axis=1)
+               X = X[mask]
+               y = y[mask]
+                
             if y is None:
                 # Solo se parte X en train/test
                 X_train, X_test = train_test_split(
@@ -617,8 +623,7 @@ def process_dataset_static(data, test_size=0.2, random_state=42):
                     "X_train": X_train, "X_test": X_test,
                     "y_train": None, "y_test": None
                 })
-                print("Entroooooo") 
-                
+                                
             else:
                 X_train, X_test, y_train, y_test = train_test_split(
                     X, y, test_size=test_size, stratify=y,
@@ -628,6 +633,7 @@ def process_dataset_static(data, test_size=0.2, random_state=42):
                     "X_train": X_train, "X_test": X_test,
                     "y_train": y_train, "y_test": y_test
                 })
+                
         elif len(data) == 4:
             # Caso: (X_train, X_test, y_train, y_test)
             X_train, X_test, y_train, y_test = data
@@ -636,7 +642,7 @@ def process_dataset_static(data, test_size=0.2, random_state=42):
                 "y_train": y_train, "y_test": y_test
             })
         elif len(data) == 3:
-            # Caso especial (data, attack_types, attack_class) -> KDDCup99
+            # Special case (data, attack_types, attack_class) -> KDDCup99
             X, attack_types, y = data
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=test_size, stratify=y, random_state=random_state
@@ -665,8 +671,8 @@ def process_dataset_ts(data, dataset_name, test_size=0.2, random_state=42):
         "power_consumption_of_tetouan_city": lambda X, y: (X.drop("DateTime", axis=1), y["Zone 1 Power Consumption"]),
         "individual_household_electric_power_consumption": lambda X, y: (X.drop(["Date", "Time"], axis=1),X["Global_active_power"]),
         "metro_interstate_traffic_volume": lambda X, y: (X.drop(["date_time", "holiday","weather_main","weather_description"], axis=1),y["traffic_volume"]),
-       
-    }
+        
+        }
 
 
 

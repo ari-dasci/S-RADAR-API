@@ -1,15 +1,15 @@
-# S-ADL-API
+# RADAR-API
 
-This is the backend API for [**S-ADL-Frontend**](https://github.com/ari-dasci/S-ADL-frontend), a system for interactive exploration of anomaly detection algorithms in different types of data.
+This is the backend API for [**RADAR-Frontend**](https://github.com/ari-dasci/RADAR-frontend), a system for interactive exploration of anomaly detection algorithms in different types of data.
 
-The API exposes endpoints to run pipelines, manage data, and execute algorithms provided by the [**S-ADL library**](https://github.com/ari-dasci/S-ADL).
+The API exposes endpoints to run pipelines, manage data, and execute algorithms provided by the [**RADAR library**](https://github.com/ari-dasci/RADAR).
 
 ---
 
 ## 🧩 Features
 
 - Modular pipeline execution
-- Integration with the S-ADL anomaly detection library
+- Integration with the RADAR anomaly detection library
 - Support for time series and tabular data
 - RESTful API built with **FastAPI**
 
@@ -26,22 +26,22 @@ The API exposes endpoints to run pipelines, manage data, and execute algorithms 
 ### Clone the API (backend) repository
 
 ```bash
-git clone https://github.com/ari-dasci/S-ADL-API.git
+git clone https://github.com/ari-dasci/RADAR-API.git
 ```
 
-### Clone the S-ADL library
+### Clone the RADAR library
 
 ```bash
-git clone https://github.com/ari-dasci/S-ADL.git
+git clone https://github.com/ari-dasci/RADAR.git
 ```
 
-### Install S-ADL library + API (conda environment)
+### Install RADAR library + API (conda environment)
 
 
 ```bash
-conda create --prefix ./envs/sadl-env python=3.10.18
+conda create --prefix ./envs/radar-env python=3.10.18
 
-conda activate ./envs/sadl-env 
+conda activate ./envs/radar-env 
 
 conda env update --prefix /path/to/env --file environment.yml --prune   # Replace /path/to/env with the location of your Conda environment.
 
@@ -58,10 +58,10 @@ pip install "fastapi[standard]"
 pip install "uvicorn[standard]"
 ```
 
-Export path to S-ADL library
+Export path to RADAR library
 
 ```bash
-export PYTHONPATH=«route_to_SADL»
+export PYTHONPATH=«route_to_RADAR»
 ```
 
 ### Run the FastAPI server
@@ -85,4 +85,4 @@ Please visit the frontend repository for:
 
 - UI for interacting with the API
 
-👉 [**S-ADL-Frontend Repository**](https://github.com/ari-dasci/S-ADL-frontend)
+👉 [**RADAR-Frontend Repository**](https://github.com/ari-dasci/RADAR-frontend)
