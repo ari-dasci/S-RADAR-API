@@ -259,7 +259,7 @@ async def run_pipeline(request: Request):
             elif(params['algorithm_'] in tsfedl_algorithms):
                 kwargs = params
                 # NEWWWWWWWW
-                # Obtener clase del top module según el algoritmo
+                # Obtain top module class according to the algorithm
                 top_class = top_modules_map.get(params['algorithm_'])
 
                 # Extraer parámetros del top module
@@ -267,7 +267,7 @@ async def run_pipeline(request: Request):
                 out_features_top = int(kwargs.pop("out_features_topmodule", 0))
                 n_pred = 1 #int(kwargs.pop("n_pred_topmodule", 1))  # configurable desde frontend
 
-                # Asignar top_module dinámicamente
+                # Assign top_module dynamically
                 if top_class and in_features_top and out_features_top:
                     kwargs["top_module"] = top_class(out_features=out_features_top, n_pred=n_pred)
 
@@ -278,33 +278,28 @@ async def run_pipeline(request: Request):
                 
 
                 print(f"kwargs before initialization: {kwargs}")
-
-                X_train, X_test, y_train, y_test = train_test_split(            # Cambiar 
-                    X, prev_output["y_train"], test_size=0.2, random_state=42
-                )
-
-                # Creación de ventanas temporales
+                                 
+                # Create temporal windows
                 processor = TimeSeriesProcessor(window_size=24, step_size=1, future_prediction=False, n_pred=n_pred)
-                X_train_w, y_train_w, X_test_w, y_test_w = processor.process_train_test(X_train, y_train, X_test, y_test)
+                X_train_w, y_train_w, X_test_w, y_test_w = processor.process_train_test(prev_output["X_train"], prev_output["y_train"], prev_output["X_test"], prev_output["y_test"])
 
-                # Conversión a tensores
+                # Convert tensors 
                 X_train_w = torch.tensor(X_train_w, dtype=torch.float32)
                 y_train_w = torch.tensor(y_train_w, dtype=torch.float32).unsqueeze(-1)  # -> (N, 24, 1)
                 X_test_w = torch.tensor(X_test_w, dtype=torch.float32)
                 y_test_w = torch.tensor(y_test_w, dtype=torch.float32).unsqueeze(-1)
 
-                # Inicializar y entrenar modelo
+                # Initialize and train model
                 model = tsfedl.TsfedlAnomalyDetection(**kwargs)
                 model.fit(X_train_w, y_train_w)
 
-                # Guardar resultados en el contexto
+                # save results in context
                 context[node_id].update({
                     "X_train_windows": X_train_w,
                     "X_test_windows": X_test_w,
                     "y_train_windows": y_train_w,
                     "y_test_windows": y_test_w,
-                    "X_test": X_test,
-                    "y_test": y_test
+                  
                 })
 
 
@@ -361,11 +356,10 @@ async def run_pipeline(request: Request):
                 # Set Tranformers train loader
                 scaler = StandardScalerPreprocessing()
                 X_scaled = scaler.fit_transform(X)
-                X_train, X_test, y_train, y_test = train_test_split(X_scaled, prev_output["y_train"], test_size=0.2, random_state=42)
-
+                
                 processor = TimeSeriesProcessor(window_size=kwargs["seq_len"], step_size=1,future_prediction=False)
-                X_train_windows, y_train_windows, X_test_windows, y_test_windows = processor.process_train_test(X_train, y_train, X_test, y_test)
-
+                #X_train_windows, y_train_windows, X_test_windows, y_test_windows = processor.process_train_test(X_train, y_train, X_test, y_test)
+                X_train_windows, y_train_windows, X_test_windows, y_test_windows = processor.process_train_test(prev_output["X_train"], prev_output["y_train"], prev_output["X_test"], prev_output["y_test"])
                 model = transformers.TransformersAnomalyDetection(**kwargs)
                 model.fit(X_train_windows)
 
@@ -374,8 +368,8 @@ async def run_pipeline(request: Request):
                 context[node_id]["X_test_windows"] = X_test_windows
                 context[node_id]["y_train_windows"] = y_train_windows
                 context[node_id]["y_test_windows"] = y_test_windows
-                context[node_id]["X_test"] = X_test
-                context[node_id]["y_test"] = y_test
+                # context[node_id]["X_test"] = X_test
+                # context[node_id]["y_test"] = y_test
 
             
             context[node_id]["model"] = model
