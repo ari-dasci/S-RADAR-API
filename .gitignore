@@ -1,5 +1,6 @@
 __pycache__/
 lightning_logs/
 .venv/
+venv/
 RADAR
 logs.log
