@@ -47,12 +47,10 @@ COPY __init__.py ./
 COPY routers/ ./routers/
 
 # If RADAR directory exists locally, use it; otherwise clone from GitHub
-COPY RADAR/ ./RADAR/
-RUN if [ ! -d "RADAR" ] || [ -z "$(ls -A RADAR 2>/dev/null)" ]; then \
-        git clone --depth 1 https://github.com/ari-dasci/S-RADAR.git /tmp/S-RADAR && \
-        mv /tmp/S-RADAR/RADAR ./RADAR && \
-        rm -rf /tmp/S-RADAR; \
-    fi
+
+RUN git clone --depth 1 https://github.com/ari-dasci/S-RADAR.git /tmp/S-RADAR && \
+    mv /tmp/S-RADAR/RADAR ./RADAR && \
+    rm -rf /tmp/S-RADAR; 
 
 # Remove git (no longer needed in production image)
 RUN apt-get purge -y git && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
