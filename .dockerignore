@@ -1,3 +1,4 @@
+# Python environments
 .venv/
 __pycache__/
 *.pyc
@@ -9,15 +10,33 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Build artifacts
 *.egg-info/
 dist/
 build/
 *.egg
+
+# Logs & temp files
 *.log
 *.bak
 *.swp
+
+# OS & IDE
 .DS_Store
 .idea/
 .vscode/
 *.iml
+
+# ML training outputs
 lightning_logs/
+
+# Docs (not needed in image)
+*.md
+!requirements.txt
+README.md
+readme_assets/
+
+# Git
+.git/
+.gitignore
