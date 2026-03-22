@@ -3,6 +3,11 @@ from fastapi import APIRouter, HTTPException,Request
 from typing import Dict, Any
 import networkx as nx  # Use for topological sorting
 from RADAR.static_data.static_datasets_uci import global_load as global_load_static
+from RADAR.static_data.anomaly_dataset_utils import (
+    build_loaded_uci_anomaly_dataset,
+    build_kddcup99_anomaly_dataset,
+    build_har_anomaly_dataset,
+)
 from RADAR.time_series.time_series_datasets_uci import global_load as global_load_ts
 from sklearn.model_selection import train_test_split
 
@@ -42,6 +47,34 @@ from TSFEDL.models_pytorch import (
     GenMinxing_Forecaster, FuJiangmeng_Forecaster, ShiHaotian_Forecaster, HuangMeiLing_Forecaster,
     HongTan_Forecaster, SharPar_Forecaster, DaiXiLi_Forecaster
 )
+
+
+def _resolve_stratify_labels(y, test_size):
+    labels = np.asarray(y).reshape(-1)
+    if labels.size == 0:
+        return None, "Stratified split skipped because target labels are empty."
+
+    _, counts = np.unique(labels, return_counts=True)
+    min_class_count = counts.min()
+    if min_class_count < 2:
+        return None, (
+            "Stratified split skipped because at least one class has fewer than 2 samples."
+        )
+
+    n_samples = labels.shape[0]
+    if isinstance(test_size, float):
+        n_test = int(np.ceil(n_samples * test_size))
+    else:
+        n_test = int(test_size)
+    n_train = n_samples - n_test
+    n_classes = len(counts)
+
+    if n_test < n_classes or n_train < n_classes:
+        return None, (
+            "Stratified split skipped because the requested train/test sizes cannot include all classes."
+        )
+
+    return y, None
 
 class PermuteDataset(Dataset):
     def __init__(self, X, y):
@@ -150,18 +183,7 @@ async def run_pipeline(request: Request):
             print(f"Loading dataset: {params}")
 
             if(node_category == "static_data"):
-                # data = global_load_static(params["dataset"])
-
-                # if isinstance(data, tuple):
-                #     if len(data) == 2:
-                #         X, y = data
-                #         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,stratify=y, random_state=42)
-                #     elif len(data) == 4:
-                #         X_train, X_test, y_train, y_test = data
-                # context[node_id] = {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test}
-               
-                raw_data = global_load_static(params["dataset"])
-                context[node_id] = process_dataset_static(raw_data,params["dataset"])
+                context[node_id] = process_dataset_static(params["dataset"])
 
             # elif(node_category == "time_series"):
             #     # Placeholder for time series dataset loading logic
@@ -223,6 +245,10 @@ async def run_pipeline(request: Request):
             print(f"Preprocessing done: {scaler_instance}")
 
         elif node_type == "Model Setup":
+            # Ensure algorithm_ is present in params (frontend may put it in node.model instead)
+            if "algorithm_" not in params and model_type:
+                params["algorithm_"] = model_type.strip().lower()
+
             print(f"Setting up model: {params['algorithm_']}")      
 
             predecessors = get_predecessors(node_id, edges)
@@ -371,7 +397,9 @@ async def run_pipeline(request: Request):
                 # context[node_id]["X_test"] = X_test
                 # context[node_id]["y_test"] = y_test
 
-            
+            else:
+                return {"message": f"Error: (Model Setup) Unknown algorithm: {params['algorithm_']}"}
+
             context[node_id]["model"] = model
             context[node_id]["X_train"] = prev_output.get("X_train", None)
             if context[node_id].get("X_test") is None:
@@ -583,73 +611,56 @@ async def run_pipeline(request: Request):
 
 
 
-def process_dataset_static(data,name_data, test_size=0.2, random_state=42):
+# ── Per-dataset normal label definitions ─────────────────────────────────
+_DATASET_NORMAL_LABELS = {
+    "shuttle": 1,                            # Class 1 = Rad Flow (~80 %)
+    "spambase": 0,                           # 0 = not spam
+    "mammographic_mass": 0,                  # 0 = benign
+    "arrhythmia": 1,                         # 1 = normal rhythm
+    "default_of_credit_card_clients": 0,     # 0 = no default
+}
+
+
+class _IdentityScaler:
+    """No-op scaler so build_* functions skip scaling (the Preprocessing node does it)."""
+    def fit_transform(self, X):
+        return X
+    def transform(self, X):
+        return X
+
+
+def process_dataset_static(dataset_name):
+    """Load and prepare a static dataset for anomaly detection.
+
+    Delegates to the build functions in ``anomaly_dataset_utils`` which handle:
+    - Loading the raw dataset
+    - Binarising labels (0 = normal, 1 = anomaly)
+    - Stratified train/test split
+    - Filtering training set to only normal samples
+    - Imputing NaN values
+
+    Scaling is skipped here (identity scaler) because the pipeline's
+    Preprocessing node handles it.
     """
-    Normaliza las distintas salidas de loaders a un formato uniforme.
-    Siempre devuelve un diccionario con train/test.
-
-    Parameters:
-    - data: salida del loader original
-    - test_size: tamaño del split para train/test si no está dado
-    - random_state: semilla
-
-    Returns:
-    dict con {X_train, X_test, y_train, y_test, metadata}
-    """
-    result = {"metadata": {}}
-
-    if isinstance(data, tuple):
-        if len(data) == 2:
-            # Caso: (X, y)  --> y maybe None
-            X, y = data
-            
-            if name_data == "mammographic_mass":
-               mask = ~np.isnan(X).any(axis=1)
-               X = X[mask]
-               y = y[mask]
-                
-            if y is None:
-                # Solo se parte X en train/test
-                X_train, X_test = train_test_split(
-                    X, test_size=test_size, random_state=random_state
-                )
-                result.update({
-                    "X_train": X_train, "X_test": X_test,
-                    "y_train": None, "y_test": None
-                })
-                                
-            else:
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=test_size, stratify=y,
-                    random_state=random_state
-                )
-                result.update({
-                    "X_train": X_train, "X_test": X_test,
-                    "y_train": y_train, "y_test": y_test
-                })
-                
-        elif len(data) == 4:
-            # Caso: (X_train, X_test, y_train, y_test)
-            X_train, X_test, y_train, y_test = data
-            result.update({
-                "X_train": X_train, "X_test": X_test,
-                "y_train": y_train, "y_test": y_test
-            })
-        elif len(data) == 3:
-            # Special case (data, attack_types, attack_class) -> KDDCup99
-            X, attack_types, y = data
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=test_size, stratify=y, random_state=random_state
-            )
-            result.update({
-                "X_train": X_train, "X_test": X_test,
-                "y_train": y_train, "y_test": y_test,
-                "metadata": {"attack_types": attack_types}
-            })
-        else:
-            raise ValueError(f"Unsupported format: {len(data)} elements.")
+    if dataset_name == "kddcup99":
+        result = build_kddcup99_anomaly_dataset(scaler_cls=_IdentityScaler)
+    elif dataset_name == "human_activity_recognition":
+        result = build_har_anomaly_dataset(scaler_cls=_IdentityScaler)
     else:
-        raise TypeError(f"Unexpected output type: {type(data)}")
+        normal_label = _DATASET_NORMAL_LABELS.get(dataset_name, 1)
+        result = build_loaded_uci_anomaly_dataset(
+            dataset_name=dataset_name,
+            normal_label=normal_label,
+            scaler_cls=_IdentityScaler,
+        )
+
+    # The build functions return y_test but not y_train;
+    # y_train is all zeros because training only contains normal samples.
+    result["y_train"] = np.zeros(result["X_train"].shape[0], dtype=int)
+
+    # Wrap extra stats into a metadata sub-dict for the pipeline context
+    meta_keys = [k for k in result if k not in ("X_train", "X_test", "y_train", "y_test")]
+    result["metadata"] = {k: result.pop(k) for k in meta_keys}
 
     return result
 

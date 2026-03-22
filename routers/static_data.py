@@ -17,6 +17,9 @@ from RADAR.static_data.algorithms import sklearn
 
 router = APIRouter()
 
+# Algorithms to exclude from frontend visibility
+EXCLUDED_ALGORITHMS = {"rgraph", "xgbod", "loci"}
+
 @router.get("/static_data/algorithms", tags=["static_data"])
 async def get_algorithms():
     return ga()['components']
@@ -37,11 +40,11 @@ async def get_library_algorithms(library: str):
 
 @router.get("/static_data/library_algorithms_pyod", tags=["static_data"])
 async def get_pyod_algorithms():
-    return list(pyod_algorithms.keys())
+    return [alg for alg in pyod_algorithms.keys() if alg not in EXCLUDED_ALGORITHMS]
 
 @router.get("/static_data/library_algorithms_sklearn", tags=["static_data"])
 async def get_sklearn_algorithms():
-    return list(sklearn_algorithms.keys())
+    return [alg for alg in sklearn_algorithms.keys() if alg not in EXCLUDED_ALGORITHMS]
 
 @router.get("/static_data/datasets", tags=["static_data"])
 async def get_datasets():
