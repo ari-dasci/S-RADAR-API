@@ -75,6 +75,52 @@ API will be available at: [http://localhost:8000](http://localhost:8000)
 Swagger documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
+
+## 🐳 Docker — Full System (Frontend + Backend)
+
+The easiest way to get the complete RADAR system running is via Docker. A single image bundles the **Angular frontend**, the **FastAPI backend**, and the **RADAR library**.
+
+### Option 1: Pull from Docker Hub
+
+```bash
+docker pull beatrizbellogarcia/radar:latest
+docker run -d -p 80:80 --name radar beatrizbellogarcia/radar:latest
+```
+
+Then open [http://localhost](http://localhost) in your browser.
+
+### Option 2: Build from source
+
+```bash
+git clone https://github.com/ari-dasci/RADAR-API.git
+cd RADAR-API
+docker build -f docker/Dockerfile -t radar-unified .
+docker run -d -p 80:80 --name radar radar-unified
+```
+
+This will automatically:
+1. Clone and compile the [RADAR-Frontend](https://github.com/ari-dasci/RADAR-frontend) Angular app.
+2. Clone the [RADAR library](https://github.com/ari-dasci/RADAR) (if not already present locally).
+3. Install all Python dependencies and bundle everything into a single lightweight image.
+
+### Useful commands
+
+```bash
+# Stop the container
+docker stop radar
+
+# Start it again
+docker start radar
+
+# View logs
+docker logs -f radar
+
+# Remove the container
+docker rm -f radar
+```
+
+---
+
 ## 📘 Full Documentation & Frontend Access
 
 Please visit the frontend repository for:
